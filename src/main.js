@@ -560,7 +560,7 @@ function addFormField(form, labelText, { type = 'text', placeholder = '', autoco
 async function openCredentialModal(platform) {
   const details = PLATFORM_DETAILS[platform];
   if (!details) {
-    showModal({ title: 'TikTok LIVE indisponible', eyebrow: 'NON PRIS EN CHARGE EN 0.4', body: 'Camton Live 0.4 ne diffuse pas vers TikTok. L’accès aux logiciels de diffusion externes dépend des autorisations accordées par TikTok à chaque compte.', items: ['Aucune clé TikTok n’est demandée.', 'Le bouton de sélection TikTok est désactivé.', 'Cette limite ne peut pas être contournée par Camton Live.'], mark: '♪' });
+    showModal({ title: 'Destination inconnue', body: 'Cette destination n’existe plus dans cette version de Camton Live.', mark: '!' });
     return;
   }
   if (!desktop?.isDesktopApp || !state.credentialStatus.available) {
@@ -765,7 +765,7 @@ function startDemo() {
 }
 
 function showLiveUnavailable() {
-  showModal({ title: 'Ouvre l’application Camton Live Windows', eyebrow: 'MOTEUR DE BUREAU REQUIS', body: 'La page Web sert uniquement d’aperçu. La capture, le chiffrement local des clés et l’encodeur RTMP fonctionnent dans l’application portable Windows x64.', items: ['Ne saisis jamais une clé dans cet aperçu Web.', 'Télécharge et lance le ZIP portable Camton Live sur Windows.', 'TikTok LIVE n’est pas pris en charge dans cette bêta.'], mark: '!' });
+  showModal({ title: 'Ouvre l’application Camton Live Windows', eyebrow: 'MOTEUR DE BUREAU REQUIS', body: 'La page Web sert uniquement d’aperçu. La capture, le chiffrement local des clés et l’encodeur RTMP fonctionnent dans l’application portable Windows x64.', items: ['Ne saisis jamais une clé dans cet aperçu Web.', 'Télécharge et lance le ZIP portable Camton Live sur Windows.', 'Seuls Twitch et YouTube sont pris en charge dans cette bêta.'], mark: '!' });
 }
 
 async function createBroadcastStream() {
@@ -940,7 +940,7 @@ function openGuide() {
       'Teste ton micro; son niveau bouge quand l’application reçoit du son.',
       'Configure Twitch avec ta clé personnelle ou YouTube avec le serveur et la clé de YouTube Studio.',
       'Camton Live chiffre les clés sur Windows. Ne partage jamais une clé et ne saisis pas ton mot de passe.',
-      'YouTube peut exiger un événement préalablement configuré et démarré dans Studio. TikTok LIVE n’est pas pris en charge.',
+      'YouTube peut exiger un événement préalablement configuré et démarré dans Studio.',
       'La démo est uniquement locale. Le bouton de diffusion envoie un vrai flux aux destinations sélectionnées.',
     ], mark: '?',
   });

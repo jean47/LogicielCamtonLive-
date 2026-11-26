@@ -8,10 +8,10 @@ Camton Live est un studio de streaming en français qui s’ouvre dans sa propre
 
 Deux formats sont livrés :
 
-- **`Camton-Live-Setup-0.4.7-x64.exe`** (recommandé) : installation par utilisateur dans `%LOCALAPPDATA%\Programs\Camton Live`, sans droits administrateur. Raccourcis sur le bureau et dans le menu Démarrer, désinstallation propre, prise en charge de l’installation silencieuse (`/S`) utilisée par les mises à jour.
-- **`Camton-Live-Portable-0.4.7-x64.zip`** : décompresse l’archive, puis lance `Camton Live.exe`. À garder dans son dossier, pas seul sur le bureau.
+- **`Camton-Live-Setup-0.4.8-x64.exe`** (recommandé) : installation par utilisateur dans `%LOCALAPPDATA%\Programs\Camton Live`, sans droits administrateur. Raccourcis sur le bureau et dans le menu Démarrer, désinstallation propre, prise en charge de l’installation silencieuse (`/S`) utilisée par les mises à jour.
+- **`Camton-Live-Portable-0.4.8-x64.zip`** : décompresse l’archive, puis lance `Camton Live.exe`. À garder dans son dossier, pas seul sur le bureau.
 
-Les deux versions partagent les mêmes réglages (mêmes identifiants d’application), donc installer la 0.4.7 par-dessus une version portable conserve ton mixage et tes clés. Les exécutables ne sont pas signés : Windows peut afficher SmartScreen (« Informations complémentaires » puis « Exécuter quand même »). Le paquet comprend FFmpeg et ses composants LGPL partagés, avec les avis de licence dans `resources/licenses/`. L’encodeur H.264 est choisi au démarrage parmi NVIDIA NVENC, Intel Quick Sync, AMD AMF et Media Foundation, chacun validé par un encodage d’essai.
+Les deux versions partagent les mêmes réglages (mêmes identifiants d’application), donc installer la 0.4.8 par-dessus une version portable conserve ton mixage et tes clés. Les exécutables ne sont pas signés : Windows peut afficher SmartScreen (« Informations complémentaires » puis « Exécuter quand même »). Le paquet comprend FFmpeg et ses composants LGPL partagés, avec les avis de licence dans `resources/licenses/`. L’encodeur H.264 est choisi au démarrage parmi NVIDIA NVENC, Intel Quick Sync, AMD AMF et Media Foundation, chacun validé par un encodage d’essai.
 
 ## Configurer une destination
 
@@ -19,7 +19,7 @@ Pour Twitch, ouvre les paramètres de diffusion de ta chaîne et copie uniquemen
 
 Pendant un direct, l’adresse d’ingestion avec la clé est transmise à FFmpeg; un outil local d’inspection des processus peut donc la voir pendant l’exécution. Protège ta session Windows et ne partage pas le compte avec des personnes non fiables. Camton Live ne la révèle pas dans son interface ou ses journaux et elle est chiffrée lorsqu’elle est stockée.
 
-La bêta n’utilise pas OAuth et ne crée pas d’événement YouTube. Camton Live distingue la connexion et l’encodage local, mais ne peut pas confirmer que la plateforme reçoit ou diffuse effectivement le flux. Vérifie la réception et l’état de l’événement dans Twitch ou YouTube Studio; selon les réglages, YouTube peut nécessiter un événement déjà créé et démarré. TikTok LIVE n’est pas disponible.
+La bêta n’utilise pas OAuth et ne crée pas d’événement YouTube. Camton Live distingue la connexion et l’encodage local, mais ne peut pas confirmer que la plateforme reçoit ou diffuse effectivement le flux. Vérifie la réception et l’état de l’événement dans Twitch ou YouTube Studio; selon les réglages, YouTube peut nécessiter un événement déjà créé et démarré. Seuls Twitch et YouTube sont proposés : TikTok LIVE ne fournit pas de clé de diffusion aux logiciels tiers.
 
 ## Sources et audio
 
@@ -96,9 +96,9 @@ https://github.com/jean47/LogicielCamtonLive-/releases/latest/download/latest.js
 Le dépôt est `jean47/LogicielCamtonLive-` et `UPDATE_MANIFEST_URL` pointe déjà sur cette adresse. Pour publier une version :
 
 ```bash
-npm version 0.4.7 --no-git-tag-version   # ou modifie package.json et src/release-notes.json
-git commit -am "Camton Live 0.4.7"
-git tag v0.4.7 && git push origin main --tags
+npm version 0.4.8 --no-git-tag-version   # ou modifie package.json et src/release-notes.json
+git commit -am "Camton Live 0.4.8"
+git tag v0.4.8 && git push origin main --tags
 ```
 
 C’est le tag qui déclenche tout. Le contrôle `Tag = version` empêche de publier une version dont les numéros divergent, et `src/whats-new.test.js` empêche de livrer des nouveautés obsolètes.

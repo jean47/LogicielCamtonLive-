@@ -1,10 +1,8 @@
 {
-  "version": "0.4.7",
+  "version": "0.4.8",
   "notes": [
-    "Xbox : le son de la carte de capture est ouvert en priorité avec la vidéo, sur l’entrée audio que Windows rattache au boîtier. C’était l’inverse auparavant, donc la vidéo seule réussissait et le son n’était jamais demandé.",
-    "Xbox : si la carte refuse le son dans la même demande, l’entrée audio est ouverte séparément puis réunie à l’image.",
-    "Xbox : en cas d’échec, le message liste les entrées audio vues par Windows, pour identifier le bon appareil.",
-    "Camton Live reste en bêta jusqu’à la version 1.0.0 : le pied de page et la notification de mise à jour affichent maintenant la version réelle.",
-    "La notification de mise à jour n’affiche plus la ligne finale sur le téléchargement."
+    "TikTok LIVE retiré de l’interface : la carte « Indisponible » et son explication disparaissent, laissant uniquement Twitch et YouTube.",
+    "Cette destination ne pouvait de toute façon pas fonctionner : TikTok ne fournit pas de clé de diffusion aux logiciels tiers, et son accès dépend du compte et du pays.",
+    "Seuls Twitch et YouTube restent proposés, avec la carte de capture Xbox comme source."
   ]
 }
