@@ -33,6 +33,8 @@ VIAddVersionKey "FileDescription" "Installateur ${APP_NAME}"
 VIAddVersionKey "FileVersion" "${VERSION}"
 VIAddVersionKey "ProductVersion" "${VERSION}"
 VIAddVersionKey "LegalCopyright" "© 2026 ${PUBLISHER}"
+VIAddVersionKey "CompanyName" "${PUBLISHER}"
+VIAddVersionKey "Comments" "Installateur par utilisateur, sans droits administrateur"
 
 !include "MUI2.nsh"
 !include "LogicLib.nsh"

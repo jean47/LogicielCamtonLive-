@@ -13,6 +13,26 @@ Deux formats sont livrés :
 
 Les deux versions partagent les mêmes réglages (mêmes identifiants d’application), donc installer la 0.5.0 par-dessus une version portable conserve ton mixage et tes clés. Les exécutables ne sont pas signés : Windows peut afficher SmartScreen (« Informations complémentaires » puis « Exécuter quand même »). Le paquet comprend FFmpeg et ses composants LGPL partagés, avec les avis de licence dans `resources/licenses/`. L’encodeur H.264 est choisi au démarrage parmi NVIDIA NVENC, Intel Quick Sync, AMD AMF et Media Foundation, chacun validé par un encodage d’essai.
 
+## Windows affiche un avertissement
+
+L’installateur n’est pas signé numériquement : Windows Defender SmartScreen, Edge ou Chrome peuvent donc bloquer le téléchargement ou afficher « Windows a protégé votre PC ». Ce n’est pas un signe d’infection, c’est l’absence de certificat de signature.
+
+Pour installer malgré l’avertissement :
+
+1. Dans Edge, ouvre le panneau de téléchargement, sélectionne le fichier, puis **Conserver** (menu `⋯` → « Conserver malgré tout »).
+2. Lance le Setup : **Informations complémentaires**, puis **Exécuter quand même**.
+3. Si Defender affiche un nom de menace au lieu de SmartScreen, ne force pas : envoie-moi le nom exact, le fichier sera soumis à Microsoft pour correction du faux positif.
+
+Vérification d’intégrité, avant d’exécuter quoi que ce soit (PowerShell) :
+
+```powershell
+Get-FileHash .\Camton-Live-Setup-0.5.0-x64.exe -Algorithm SHA256
+```
+
+L’empreinte doit correspondre à celle publiée dans `SHA256.txt` avec la release. Si elle diffère, le fichier a été altéré : ne l’installe pas.
+
+Chaque nouvelle version repart sans réputation auprès de Microsoft : l’avertissement revient donc à chaque sortie. La seule suppression définitive passe par un certificat de signature de code, pas par une modification du paquet.
+
 ## Configurer une destination
 
 Pour Twitch, ouvre les paramètres de diffusion de ta chaîne et copie uniquement ta clé de stream dans Camton Live. Pour YouTube, crée ou sélectionne ton événement dans YouTube Studio, puis copie l’adresse du serveur d’ingestion et la clé affichées par Studio. Camton Live chiffre ces valeurs dans le stockage local protégé du système Windows. Les mots de passe YouTube/Twitch ne sont jamais demandés. Pour effacer une clé, utilise le bouton de suppression dans la configuration de la plateforme.

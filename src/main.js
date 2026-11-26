@@ -1274,6 +1274,7 @@ function openGuide() {
       'Camton Live chiffre les clés sur Windows. Ne partage jamais une clé et ne saisis pas ton mot de passe.',
       'YouTube peut exiger un événement préalablement configuré et démarré dans Studio.',
       'La démo est uniquement locale. Le bouton de diffusion envoie un vrai flux aux destinations sélectionnées.',
+      'Windows peut avertir au téléchargement : l’installateur n’est pas encore signé. « Informations complémentaires » puis « Exécuter quand même ».',
     ], mark: '?',
   });
 }
