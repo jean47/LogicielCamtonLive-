@@ -1,8 +1,8 @@
 {
-  "version": "0.4.8",
+  "version": "0.4.9",
   "notes": [
-    "TikTok LIVE retiré de l’interface : la carte « Indisponible » et son explication disparaissent, laissant uniquement Twitch et YouTube.",
-    "Cette destination ne pouvait de toute façon pas fonctionner : TikTok ne fournit pas de clé de diffusion aux logiciels tiers, et son accès dépend du compte et du pays.",
-    "Seuls Twitch et YouTube restent proposés, avec la carte de capture Xbox comme source."
+    "Vérification des mises à jour : une seule adresse est interrogée, celle de la dernière release GitHub.",
+    "L’ancien secours, resté figé sur la version 0.4.3, est supprimé : il ne peut plus annoncer une version plus ancienne que celle installée.",
+    "Cette version ne contient que cette correction ; les nouveautés de la 0.5.0 arrivent séparément."
   ]
 }
