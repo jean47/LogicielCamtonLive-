@@ -1,4 +1,7 @@
 import { LIVE_PROFILES, PLATFORM_DETAILS, PLATFORM_IDS } from './platforms.js';
+import { createAudioDesk } from './audio-desk.js';
+import releaseNotes from './release-notes.json';
+import { parseNotes, shouldAnnounce } from './whats-new.js';
 import './styles/index.css';
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -18,10 +21,6 @@ const storedPlatforms = readArray('lumacast-platforms', 'sf-platforms').filter((
 const state = {
   sourceTab: 'pc',
   sourceStream: null,
-  micStream: null,
-  micDeviceId: '',
-  meterContexts: new Map(),
-  meterFrames: new Map(),
   timerInterval: null,
   demoStartedAt: null,
   demoRunning: false,
@@ -34,7 +33,6 @@ const state = {
   stopRequested: false,
   mediaRecorder: null,
   mixedStream: null,
-  mixContext: null,
   chunkQueue: Promise.resolve(),
   queuedBytes: 0,
   toastTimer: null,
@@ -44,6 +42,40 @@ const state = {
   updateDismissed: false,
   removeUpdateListener: null,
 };
+
+const audioDesk = createAudioDesk({
+  listElement: $('#audioTracks'),
+  master: { volume: $('#masterVolume'), mute: $('#masterMuted'), meter: $('#masterLevel') },
+  onStatus: ({ active, micReady }) => {
+    $('#audioSectionStatus').innerHTML = micReady
+      ? `<span class="status-dot ready"></span> ${active > 1 ? `${active} pistes actives` : 'Micro actif'}`
+      : '<span class="status-dot muted"></span> Micro à activer';
+  },
+  onError: (error, noun) => showMediaError(error, noun),
+  onToast: (message, type) => showToast(message, type),
+});
+
+const SEEN_VERSION_KEY = 'camton-seen-version';
+
+function showWhatsNew({ version, notes, eyebrow = 'NOUVEAUTÉS' }) {
+  const items = Array.isArray(notes) ? notes : parseNotes(notes);
+  if (!items.length) return false;
+  showModal({
+    title: `Quoi de neuf dans la ${version}`,
+    eyebrow,
+    body: 'Voici ce qui change dans cette version. Tes réglages restent en place.',
+    items,
+    mark: '✦',
+    action: 'Découvrir',
+  });
+  return true;
+}
+
+function announceWhatsNew() {
+  if (!shouldAnnounce({ currentVersion: releaseNotes.version, lastSeenVersion: localStorage.getItem(SEEN_VERSION_KEY) })) return;
+  const shown = showWhatsNew({ version: releaseNotes.version, notes: releaseNotes.notes });
+  if (shown) localStorage.setItem(SEEN_VERSION_KEY, releaseNotes.version);
+}
 
 function showToast(message, type = 'success') {
   const toast = $('#toast');
@@ -94,6 +126,7 @@ function renderUpdateNotice(update = state.updateStatus) {
     action.textContent = 'Télécharger la mise à jour';
     action.disabled = false;
   }
+  $('#updateNotes').classList.toggle('hidden', !state.updateStatus.releaseNotes?.trim());
   $('#updateDismiss').classList.toggle('hidden', status === 'downloading' || status === 'installing');
   notice.classList.remove('hidden');
 }
@@ -203,25 +236,6 @@ function stopTracks(stream) {
   if (stream) stream.getTracks().forEach((track) => track.stop());
 }
 
-function stopMeter(meterElement) {
-  const frame = state.meterFrames.get(meterElement);
-  if (frame) cancelAnimationFrame(frame);
-  state.meterFrames.delete(meterElement);
-  const context = state.meterContexts.get(meterElement);
-  if (context) context.close().catch(() => {});
-  state.meterContexts.delete(meterElement);
-  const fill = $('.meter-fill', meterElement.closest('.audio-signal-row'));
-  if (fill) fill.style.width = '0%';
-}
-
-function resetMicUi(message = 'Pas encore testé') {
-  $('#micTestBtn').innerHTML = '<span id="micButtonIcon">▷</span> Tester mon micro';
-  $('#micStatus').textContent = message;
-  $('#micLed').classList.remove('on');
-  $('#micLevel').style.width = '0%';
-  $('#audioSectionStatus').innerHTML = '<span class="status-dot muted"></span> À tester';
-}
-
 function stopSource({ stopMic = true } = {}) {
   stopTracks(state.sourceStream);
   state.sourceStream = null;
@@ -232,18 +246,9 @@ function stopSource({ stopMic = true } = {}) {
   $('#previewTag').classList.remove('active');
   $('#previewTag').innerHTML = '<i></i> APERÇU INACTIF';
   $('#resolutionLabel').textContent = '— × — · — FPS';
-  $('#gameAudioLed').classList.remove('on');
-  $('#gameAudioLevel').style.width = '0%';
-  $('#gameAudioStatus').textContent = 'En attente';
-  stopMeter($('#gameAudioLevel'));
+  audioDesk.setSourceStream(null);
   setSourceStatus('Aucune source sélectionnée', false);
-  if (stopMic && state.micStream) {
-    stopTracks(state.micStream);
-    state.micStream = null;
-    state.micDeviceId = '';
-    stopMeter($('#micLevel'));
-    resetMicUi();
-  }
+  if (stopMic) audioDesk.releaseCaptures();
 }
 
 function showMediaError(error, noun = 'la source vidéo') {
@@ -277,9 +282,7 @@ async function startPreview(stream, label) {
   const fps = settings.frameRate ? Math.round(settings.frameRate) : 30;
   $('#resolutionLabel').textContent = width && height ? `${width} × ${height} · ${fps} FPS` : `Aperçu local · ${fps} FPS`;
   setSourceStatus(`${label} — aperçu en cours`, true);
-  $('#gameAudioStatus').textContent = stream.getAudioTracks().length ? 'Son de la source' : 'Pas de son système';
-  $('#gameAudioLed').classList.toggle('on', !!stream.getAudioTracks().length);
-  if (stream.getAudioTracks().length) beginMeter(stream, $('#gameAudioLevel'));
+  audioDesk.setSourceStream(stream);
   videoTrack?.addEventListener('ended', () => {
     if (state.sourceStream !== stream) return;
     if (state.isStreaming) {
@@ -297,41 +300,8 @@ async function startPreview(stream, label) {
   await video.play().catch(() => {});
 }
 
-function beginMeter(stream, meterElement) {
-  stopMeter(meterElement);
-  const audioTrack = stream.getAudioTracks()[0];
-  if (!audioTrack) return;
-  try {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) return;
-    const context = new AudioContextClass();
-    const input = context.createMediaStreamSource(new MediaStream([audioTrack]));
-    const analyser = context.createAnalyser();
-    analyser.fftSize = 256;
-    input.connect(analyser);
-    const data = new Uint8Array(analyser.frequencyBinCount);
-    state.meterContexts.set(meterElement, context);
-    const draw = () => {
-      if (state.meterContexts.get(meterElement) !== context) return;
-      analyser.getByteTimeDomainData(data);
-      let sum = 0;
-      for (const value of data) {
-        const normalized = (value - 128) / 128;
-        sum += normalized * normalized;
-      }
-      const rms = Math.sqrt(sum / data.length);
-      meterElement.style.width = `${Math.min(100, Math.max(3, Math.round(rms * 360)))}%`;
-      state.meterFrames.set(meterElement, requestAnimationFrame(draw));
-    };
-    draw();
-  } catch {
-    // Le niveau audio est seulement informatif; la capture peut continuer sans vu-mètre.
-  }
-}
-
 async function loadDevices({ requestPermission = false } = {}) {
   const captureSelect = $('#captureCardSelect');
-  const micSelect = $('#micSelect');
   if (!navigator.mediaDevices?.enumerateDevices) {
     showToast('La détection nécessite une version récente de Windows et de l’application.', 'warning');
     return;
@@ -347,17 +317,12 @@ async function loadDevices({ requestPermission = false } = {}) {
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
     const videos = devices.filter((device) => device.kind === 'videoinput');
-    const audios = devices.filter((device) => device.kind === 'audioinput');
     captureSelect.replaceChildren();
     if (!videos.length) captureSelect.add(new Option('Aucun appareil vidéo détecté', ''));
     else {
       captureSelect.add(new Option('Choisir un appareil vidéo…', ''));
       videos.forEach((device, index) => captureSelect.add(new Option(device.label || `Caméra / carte de capture ${index + 1}`, device.deviceId)));
     }
-    const selectedMic = $('#micSelect').value;
-    micSelect.replaceChildren(new Option('Micro par défaut', ''));
-    audios.forEach((device, index) => micSelect.add(new Option(device.label || `Microphone ${index + 1}`, device.deviceId)));
-    if (selectedMic && audios.some((device) => device.deviceId === selectedMic)) micSelect.value = selectedMic;
     $('#captureHelp').textContent = videos.length
       ? `${videos.length} appareil${videos.length > 1 ? 's' : ''} vidéo détecté${videos.length > 1 ? 's' : ''}. Choisis ta carte dans la liste.`
       : 'Aucune caméra ou carte listée. Branche-la en USB, vérifie le HDMI IN, puis scanne à nouveau.';
@@ -405,32 +370,6 @@ function toggleSourceTab(tab) {
   });
   $('#pcSourceBody').classList.toggle('hidden', tab !== 'pc');
   $('#xboxSourceBody').classList.toggle('hidden', tab !== 'xbox');
-}
-
-async function toggleMic() {
-  if (state.micStream) {
-    stopTracks(state.micStream);
-    state.micStream = null;
-    state.micDeviceId = '';
-    stopMeter($('#micLevel'));
-    resetMicUi('Test arrêté');
-    return;
-  }
-  try {
-    const selectedDevice = $('#micSelect').value;
-    const audio = selectedDevice ? { deviceId: { exact: selectedDevice } } : true;
-    const stream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
-    state.micStream = stream;
-    state.micDeviceId = selectedDevice;
-    $('#micTestBtn').innerHTML = '<span>■</span> Arrêter le test';
-    $('#micStatus').textContent = 'Parle pour voir le niveau';
-    $('#micLed').classList.add('on');
-    $('#audioSectionStatus').innerHTML = '<span class="status-dot ready"></span> Micro actif';
-    beginMeter(stream, $('#micLevel'));
-    await loadDevices();
-  } catch (error) {
-    showMediaError(error, 'ton micro');
-  }
 }
 
 function updateCredentialStatus(status) {
@@ -737,43 +676,10 @@ function showLiveUnavailable() {
 
 async function createBroadcastStream() {
   if (!state.sourceStream?.getVideoTracks().some((track) => track.readyState === 'live')) throw new Error('Aucune source vidéo active.');
-  if (!state.micStream?.getAudioTracks().some((track) => track.readyState === 'live')) {
-    stopTracks(state.micStream);
-    state.micStream = null;
-    state.micDeviceId = '';
-    stopMeter($('#micLevel'));
-    const selectedDevice = $('#micSelect').value;
-    const audio = selectedDevice ? { deviceId: { exact: selectedDevice } } : true;
-    state.micStream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
-    state.micDeviceId = selectedDevice;
-    $('#micTestBtn').innerHTML = '<span>■</span> Micro actif';
-    $('#micStatus').textContent = 'Micro utilisé pour le direct';
-    $('#micLed').classList.add('on');
-    $('#audioSectionStatus').innerHTML = '<span class="status-dot ready"></span> Micro actif';
-    beginMeter(state.micStream, $('#micLevel'));
-    await loadDevices();
-  }
-  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContextClass) throw new Error('Le mixage audio n’est pas disponible sur cette version de Windows.');
-  const context = new AudioContextClass();
-  state.mixContext = context;
-  await context.resume();
-  const destination = context.createMediaStreamDestination();
-  const inputs = [state.sourceStream, state.micStream].filter((stream) => stream?.getAudioTracks().some((track) => track.readyState === 'live'));
-  if (!inputs.some((stream) => stream === state.micStream)) throw new Error('Choisis un microphone pour continuer.');
-  for (const stream of inputs) {
-    const track = stream.getAudioTracks()[0];
-    const source = context.createMediaStreamSource(new MediaStream([track]));
-    const gain = context.createGain();
-    // La voix reste au premier plan, le son de la source est légèrement en retrait.
-    gain.gain.value = stream === state.micStream ? 1 : 0.7;
-    source.connect(gain).connect(destination);
-  }
-  const tracks = [
-    ...state.sourceStream.getVideoTracks(),
-    ...destination.stream.getAudioTracks(),
-  ];
-  state.mixedStream = new MediaStream(tracks);
+  if (!(await audioDesk.ensurePrimaryMic())) throw new Error('Choisis un microphone pour continuer.');
+  const mixed = await audioDesk.getOutputStream();
+  if (!mixed.getAudioTracks().length) throw new Error('Le mixage audio n’a produit aucune piste.');
+  state.mixedStream = new MediaStream([...state.sourceStream.getVideoTracks(), ...mixed.getAudioTracks()]);
   return state.mixedStream;
 }
 
@@ -874,13 +780,7 @@ async function startLive() {
     state.isStreaming = false;
     renderUpdateNotice();
     state.streamStatuses = {};
-    stopTracks(state.micStream);
-    state.micStream = null;
-    state.micDeviceId = '';
-    stopMeter($('#micLevel'));
-    resetMicUi('Micro arrêté après l’échec du démarrage');
-    if (state.mixContext) state.mixContext.close().catch(() => {});
-    state.mixContext = null;
+    audioDesk.releaseCaptures();
     state.mixedStream = null;
     const message = error?.message || 'Impossible de démarrer le moteur de diffusion.';
     if (/micro|permission|media|device/i.test(message)) showMediaError(error, 'ton microphone');
@@ -912,8 +812,7 @@ async function stopLive({ fromFailure = false } = {}) {
   state.mediaRecorder = null;
   state.mixedStream?.getTracks().forEach((track) => track.stop());
   state.mixedStream = null;
-  if (state.mixContext) await state.mixContext.close().catch(() => {});
-  state.mixContext = null;
+  audioDesk.releaseCaptures();
   clearInterval(state.timerInterval);
   $('#startLiveBtn').innerHTML = 'Démarrer un direct <span>→</span>';
   $('#startLiveBtn').classList.remove('stream-active-button');
@@ -1039,19 +938,30 @@ function init() {
     else stopSource();
     showToast('Aperçu arrêté. Les pistes sélectionnées ont été libérées.');
   });
-  $('#micSelect').addEventListener('change', () => {
-    if (state.isStreaming) {
-      $('#micSelect').value = state.micDeviceId || '';
-      showToast('Arrête le direct avant de changer de microphone.', 'warning');
-      return;
-    }
-    if (state.micStream) stopTracks(state.micStream);
-    state.micStream = null;
-    state.micDeviceId = '';
-    stopMeter($('#micLevel'));
-    resetMicUi('Micro sélectionné; teste-le avant le direct');
+  const closeAddTrackMenu = () => {
+    $('#addTrackMenu').classList.add('hidden');
+    $('#addTrackBtn').setAttribute('aria-expanded', 'false');
+  };
+  $('#addTrackBtn').addEventListener('click', (event) => {
+    event.stopPropagation();
+    const open = $('#addTrackMenu').classList.toggle('hidden') === false;
+    $('#addTrackBtn').setAttribute('aria-expanded', String(open));
   });
-  $('#micTestBtn').addEventListener('click', toggleMic);
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('.add-track')) closeAddTrackMenu();
+  });
+  $$('[data-add-track]').forEach((button) => button.addEventListener('click', () => {
+    closeAddTrackMenu();
+    if (button.dataset.addTrack === 'music') $('#musicFile').click();
+    else audioDesk.addTrack(button.dataset.addTrack);
+  }));
+  $('#musicFile').addEventListener('change', async (event) => {
+    const [file] = event.target.files || [];
+    event.target.value = '';
+    if (!file) return;
+    const track = await audioDesk.addTrack('music');
+    await audioDesk.loadMusicFile(track, file);
+  });
   $$('[data-platform]').forEach((input) => input.addEventListener('change', handlePlatformToggle));
   $$('[data-platform-info]').forEach((button) => button.addEventListener('click', () => openCredentialModal(button.dataset.platformInfo)));
   $$('input[name="quality"]').forEach((input) => input.addEventListener('change', () => {
@@ -1072,6 +982,13 @@ function init() {
     body: 'L’aperçu et le mixage sont locaux. Pendant un direct, l’application transmet le flux uniquement aux destinations que tu as choisies. Les clés sont chiffrées par le stockage sécurisé de Windows.',
     items: ['Aucun mot de passe ou cookie de plateforme n’est demandé.', 'Les clés ne vont pas dans localStorage, sur un serveur Camton Live ou dans les journaux.', 'Tu peux supprimer les clés dans la configuration de chaque destination.', 'Arrêter le direct termine les sorties et libère les pistes média.'], mark: '✓',
   }));
+  $('#updateNotes').addEventListener('click', () => {
+    showWhatsNew({
+      version: state.updateStatus.latestVersion || releaseNotes.version,
+      notes: state.updateStatus.releaseNotes,
+      eyebrow: 'MISE À JOUR DISPONIBLE',
+    });
+  });
   $('#modalClose').addEventListener('click', closeModal);
   $('#modalOk').addEventListener('click', closeModal);
   $('#modalBackdrop').addEventListener('click', (event) => { if (event.target === $('#modalBackdrop')) closeModal(); });
@@ -1083,6 +1000,10 @@ function init() {
   if (navigator.mediaDevices?.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => loadDevices());
   loadDevices();
   refreshCredentialStatus();
+  setTimeout(() => {
+    if ($('#modalBackdrop')?.classList.contains('open')) return;
+    announceWhatsNew();
+  }, 900);
 }
 
 init();

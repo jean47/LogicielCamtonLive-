@@ -8,7 +8,7 @@ const { Transform } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 const { URL } = require('node:url');
 
-const UPDATE_MANIFEST_URL = 'https://streamfacile-m7dasb9x.manus.space/updates/latest.json';
+const UPDATE_MANIFEST_URL = 'https://raw.githubusercontent.com/jean47/camton-live-updates/main/updates/latest.json';
 const MANIFEST_MAX_BYTES = 256 * 1024;
 const INSTALLER_MAX_BYTES = 1024 * 1024 * 1024;
 const REDIRECT_LIMIT = 4;

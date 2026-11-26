@@ -45,3 +45,20 @@ npm run desktop:win    # ffmpeg:fetch + build + electron-builder (ZIP portable)
 - `npm run desktop:win` produit `release/Camton-Live-Portable-<version>-x64.zip` (cible `zip`, pas d'installeur).
 - L'extraction du ZIP FFmpeg est faite en Node pur (`zlib.inflateRawSync`) : ne pas réintroduire d'appel à `unzip`/`tar`, absents par défaut sous Windows.
 - `vendor/ffmpeg/win-x64/` et `release/` sont ignorés par git : jamais committés.
+
+## Audio
+
+- `src/audio-mixer.js` : graphe Web Audio et logique pure (`resolveTrackGains`, `clampVolume`, `levelPercent`). Un seul `AudioContext` pour toute l’application ; ne pas recréer un contexte par vu-mètre.
+- `src/audio-desk.js` : pistes, interface, capture micro/musique et persistance (`localStorage` → `camton-mixer`).
+- `main.js` ne fait que relayer : `setSourceStream()` à l’aperçu, `ensurePrimaryMic()` + `getOutputStream()` au démarrage du direct, `releaseCaptures()` à l’arrêt.
+
+## Nouveautés et publication
+
+- `src/release-notes.json` doit porter la même version que `package.json` (test dédié dans `src/whats-new.test.js`).
+- À chaque version publiée : mettre à jour `public/Updates/latest.json` (version, `downloadUrl`, `sha256`, `releaseNotes`) et le déposer sur l’hébergement du manifeste.
+
+## Installateur Windows
+
+- `installer/setup.nsi` + `scripts/build-installer.mjs` remplacent la cible `nsis` d’electron-builder, qui exige Wine sous Linux. `makensis` s’exécute nativement ; sous Linux il faut exporter `NSISDIR` vers la racine de la distribution (fait par le script).
+- Installation par utilisateur dans `%LOCALAPPDATA%\Programs\Camton Live` (`RequestExecutionLevel user`), avec `/S` pour la mise à jour silencieuse et `taskkill` de l’instance en cours avant la copie.
+- `release/` contient `Camton-Live-Setup-<version>-x64.exe` et `Camton-Live-Portable-<version>-x64.zip`. L’installateur doit être reconstruit après tout changement de `dist/`, puis son SHA-256 reporté dans `updates/latest.json`.

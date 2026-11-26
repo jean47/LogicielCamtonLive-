@@ -147,43 +147,39 @@
             <header class="section-head">
               <span class="section-index">02</span>
               <div class="section-title">
-                <h2 id="audioTitle">Ton son & ton micro</h2>
-                <p>Le micro est nécessaire pour démarrer un direct.</p>
+                <h2 id="audioTitle">Ta table de mixage</h2>
+                <p>Une piste par son&nbsp;: volume, muet, solo et niveau en direct.</p>
               </div>
-              <span class="section-status" id="audioSectionStatus"><span class="status-dot muted"></span> À tester</span>
+              <span class="section-status" id="audioSectionStatus"><span class="status-dot muted"></span> Micro à activer</span>
             </header>
 
-            <div class="panel audio-panel">
-              <div class="audio-col">
-                <div class="audio-head">
+            <div class="panel mixer-panel">
+              <header class="mixer-head">
+                <div class="mixer-title">
                   <span class="audio-glyph" aria-hidden="true">♫</span>
-                  <div><h3>Son de la source</h3><p>Mélangé quand il est disponible.</p></div>
+                  <div><h3>Pistes audio</h3><p>Le micro principal reste obligatoire pour démarrer un direct.</p></div>
                 </div>
-                <div class="audio-signal-row">
-                  <span class="signal-led" id="gameAudioLed" aria-hidden="true"></span>
-                  <span class="meter" aria-hidden="true"><span class="meter-fill" id="gameAudioLevel"></span></span>
-                  <span class="audio-caption" id="gameAudioStatus">En attente</span>
+                <div class="master-strip">
+                  <span class="master-label">Master</span>
+                  <span class="meter master-meter" aria-hidden="true"><span class="meter-fill" id="masterLevel"></span></span>
+                  <input class="track-volume" id="masterVolume" type="range" min="0" max="100" step="1" value="100" aria-label="Volume général du direct">
+                  <button class="mixer-btn" id="masterMuted" type="button" aria-pressed="false" title="Couper tout le son">M</button>
                 </div>
-                <p class="audio-note">Le son d’écran dépend de Windows et de la carte&nbsp;; le microphone reste requis.</p>
-              </div>
+              </header>
 
-              <div class="audio-divider" aria-hidden="true"></div>
+              <ul class="track-list" id="audioTracks" aria-label="Pistes audio du direct"></ul>
 
-              <div class="audio-col">
-                <div class="audio-head">
-                  <span class="audio-glyph audio-glyph--mic" aria-hidden="true">♩</span>
-                  <div><h3>Ton micro</h3><p>Choisis le micro que ton public entendra.</p></div>
+              <footer class="mixer-foot">
+                <div class="add-track">
+                  <button class="button button-secondary" id="addTrackBtn" type="button" aria-expanded="false" aria-controls="addTrackMenu">+ Ajouter une piste</button>
+                  <div class="add-track-menu hidden" id="addTrackMenu" role="menu" aria-labelledby="addTrackBtn">
+                    <button role="menuitem" type="button" data-add-track="mic2"><span aria-hidden="true">♫</span> Second micro</button>
+                    <button role="menuitem" type="button" data-add-track="music"><span aria-hidden="true">♪</span> Musique (fichier)</button>
+                  </div>
                 </div>
-                <div class="field-row">
-                  <select id="micSelect" aria-label="Sélectionner le microphone"><option value="">Micro par défaut</option></select>
-                  <button class="button button-secondary" id="micTestBtn" type="button"><span id="micButtonIcon" aria-hidden="true">▷</span> Tester mon micro</button>
-                </div>
-                <div class="audio-signal-row">
-                  <span class="signal-led" id="micLed" aria-hidden="true"></span>
-                  <span class="meter" aria-hidden="true"><span class="meter-fill" id="micLevel"></span></span>
-                  <span class="audio-caption" id="micStatus">Pas encore testé</span>
-                </div>
-              </div>
+                <p class="microcopy" id="mixerHint">Le son de la source arrive tout seul dès qu’un aperçu avec son est actif.</p>
+                <input type="file" id="musicFile" accept="audio/*" class="hidden" />
+              </footer>
             </div>
           </section>
 
@@ -290,6 +286,7 @@
         <div class="update-progress hidden" id="updateProgressTrack" aria-label="Progression du téléchargement"><span id="updateProgressBar"></span></div>
         <div class="update-actions">
           <button class="button button-primary" id="updateAction" type="button">Télécharger</button>
+          <button class="button button-secondary hidden" id="updateNotes" type="button">Nouveautés</button>
           <button class="button button-secondary" id="updateDismiss" type="button">Plus tard</button>
         </div>
       </div>
