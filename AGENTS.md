@@ -39,3 +39,9 @@ npm run desktop:win    # ffmpeg:fetch + build + electron-builder (ZIP portable)
 - Les tests du moteur utilisent un faux FFmpeg en shell réel (pas de mock de comportement) qui expose `-encoders` puis draine stdin.
 - `npm run ffmpeg:fetch` pointe sur `scripts/` (pluriel) : ne pas recréer un dossier `script/`.
 - `vite.config.js` doit garder `base: './'` : Electron charge `dist/index.html` en `file://`.
+
+## Packaging
+
+- `npm run desktop:win` produit `release/Camton-Live-Portable-<version>-x64.zip` (cible `zip`, pas d'installeur).
+- L'extraction du ZIP FFmpeg est faite en Node pur (`zlib.inflateRawSync`) : ne pas réintroduire d'appel à `unzip`/`tar`, absents par défaut sous Windows.
+- `vendor/ffmpeg/win-x64/` et `release/` sont ignorés par git : jamais committés.

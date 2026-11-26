@@ -4,9 +4,9 @@ import { access, copyFile, mkdir, mkdtemp, readdir, readFile, rm, writeFile } fr
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawnSync } from 'node:child_process';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { inflateRawSync } from 'node:zlib';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ASSET = 'ffmpeg-n9.0.2-58-g8c7ef49002-win64-lgpl-shared-9.0.zip';
@@ -24,10 +24,41 @@ async function hashFile(file) {
   return hash.digest('hex');
 }
 
-function run(command, args, options = {}) {
-  const result = spawnSync(command, args, { stdio: 'inherit', ...options });
-  if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`${command} a échoué (${result.status ?? 'signal'}).`);
+function findEndOfCentralDirectory(buffer) {
+  const stop = Math.max(0, buffer.length - 66_000);
+  for (let offset = buffer.length - 22; offset >= stop; offset -= 1) {
+    if (buffer.readUInt32LE(offset) === 0x06054b50) return offset;
+  }
+  throw new Error('Archive ZIP invalide : fin du répertoire introuvable.');
+}
+
+// Extraction en Node pur : aucun `unzip`/`tar` système requis, sur Windows comme sur Linux.
+async function extractZip(archive, destination) {
+  const buffer = await readFile(archive);
+  const end = findEndOfCentralDirectory(buffer);
+  const entries = buffer.readUInt16LE(end + 10);
+  const root = path.resolve(destination) + path.sep;
+  let cursor = buffer.readUInt32LE(end + 16);
+
+  for (let index = 0; index < entries; index += 1) {
+    if (buffer.readUInt32LE(cursor) !== 0x02014b50) throw new Error('Archive ZIP invalide : entrée inattendue.');
+    const method = buffer.readUInt16LE(cursor + 10);
+    const compressedSize = buffer.readUInt32LE(cursor + 20);
+    const nameLength = buffer.readUInt16LE(cursor + 28);
+    const extraLength = buffer.readUInt16LE(cursor + 30);
+    const commentLength = buffer.readUInt16LE(cursor + 32);
+    const localOffset = buffer.readUInt32LE(cursor + 42);
+    const name = buffer.toString('utf8', cursor + 46, cursor + 46 + nameLength);
+    cursor += 46 + nameLength + extraLength + commentLength;
+    if (name.endsWith('/')) continue;
+
+    const target = path.resolve(destination, name);
+    if (!target.startsWith(root)) throw new Error(`Chemin ZIP inattendu : ${name}`);
+    const dataStart = localOffset + 30 + buffer.readUInt16LE(localOffset + 26) + buffer.readUInt16LE(localOffset + 28);
+    const data = buffer.subarray(dataStart, dataStart + compressedSize);
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, method === 0 ? data : inflateRawSync(data));
+  }
 }
 
 async function main() {
@@ -54,8 +85,7 @@ async function main() {
 
   const stage = await mkdtemp(path.join(tmpdir(), 'camton-live-ffmpeg-'));
   try {
-    if (process.platform === 'win32') run('tar', ['-xf', ZIP, '-C', stage]);
-    else run('unzip', ['-q', ZIP, '-d', stage]);
+    await extractZip(ZIP, stage);
 
     const roots = await readdir(stage, { withFileTypes: true });
     let bundle = null;
