@@ -1,0 +1,60 @@
+{
+  "name": "camton-live",
+  "version": "0.4.3",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.cjs",
+  "description": "Camton Live — studio de streaming pour Windows",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 3000 --strictPort",
+    "test": "node --test electron/*.test.cjs",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 3000 --strictPort",
+    "desktop:dev": "concurrently -k \"npm:dev\" \"wait-on http://127.0.0.1:3000 && electron .\"",
+    "ffmpeg:fetch": "node scripts/fetch-ffmpeg.mjs",
+    "desktop:win": "npm run ffmpeg:fetch && npm run build && electron-builder --win zip --x64"
+  },
+  "build": {
+    "appId": "fr.camtonlive.desktop",
+    "productName": "Camton Live",
+    "copyright": "Copyright © 2026 Camton Live contributors",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "vendor/ffmpeg/win-x64",
+        "to": "ffmpeg",
+        "filter": [
+          "bin/**/*",
+          "LICENSE.txt",
+          "BUILD-INFO.txt"
+        ]
+      },
+      {
+        "from": "licenses/ThirdPartyNotices.txt",
+        "to": "licenses/ThirdPartyNotices.txt"
+      }
+    ],
+    "win": {
+      "target": [
+        "zip"
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "Camton-Live-Portable-${version}-${arch}.${ext}"
+    }
+  },
+  "devDependencies": {
+    "vite": "6.4.6",
+    "electron": "45.4.1",
+    "electron-builder": "26.18.0",
+    "concurrently": "10.0.7",
+    "wait-on": "9.5.1"
+  }
+}

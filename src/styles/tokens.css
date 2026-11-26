@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+/* Jetons de design Camton Live : palette reprise du logo (violet, magenta, or). */
+:root {
+  color-scheme: dark;
+
+  --font-body: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Space Grotesk', 'DM Sans', sans-serif;
+
+  --bg: #0a0913;
+  --bg-deep: #070610;
+  --surface: #12111f;
+  --surface-2: #181630;
+  --surface-3: #201d3b;
+  --line: #2c2544;
+  --line-strong: #3f3665;
+
+  --text: #f2eefb;
+  --text-soft: #c9c3d8;
+  --text-muted: #9a93ab;
+
+  --gold: #fbc45e;
+  --gold-soft: #ffd98d;
+  --gold-deep: #d99b34;
+  --orange: #faa44d;
+  --magenta: #ba18df;
+  --violet: #6602d1;
+  --blue: #236fdb;
+  --cyan: #39c8ff;
+  --red: #ff7a80;
+  --green: #7ee0a1;
+
+  --radius-xs: 6px;
+  --radius-sm: 9px;
+  --radius: 13px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .35);
+  --shadow: 0 16px 38px rgba(0, 0, 0, .3);
+  --shadow-lg: 0 32px 90px rgba(0, 0, 0, .5);
+
+  --sidebar-w: 248px;
+  --page-max: 1240px;
+  --focus-ring: 0 0 0 3px rgba(251, 196, 94, .38);
+
+  --fs-xs: .78rem;
+  --fs-sm: .86rem;
+  --fs-base: .95rem;
+  --fs-md: 1.06rem;
+  --fs-lg: 1.32rem;
+  --fs-xl: 1.95rem;
+  --fs-2xl: 2.5rem;
+
+  --ease: cubic-bezier(.22, .61, .36, 1);
+}

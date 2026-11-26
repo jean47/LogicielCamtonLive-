@@ -1,0 +1,24 @@
+Camton Live 0.4.0 — avis relatifs aux composants redistribués
+
+FFmpeg n9.0.2-58-g8c7ef49002 — build Windows x86_64, LGPL shared
+Build tierce : FFmpeg-Builds, release autobuild-2026-11-19-12-39
+Archive d’origine : https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/autobuild-2026-11-19-12-39/ffmpeg-n9.0.2-58-g8c7ef49002-win64-lgpl-shared-9.0.zip
+SHA-256 de l’archive d’origine : 1fdb837def412ad7cc019874b6310156f40179bd30df58d041a82413f800a331
+Code source FFmpeg : https://github.com/FFmpeg/FFmpeg/tree/g8c7ef49002
+Recettes de build : https://github.com/FFmpeg-Builds/FFmpeg-Builds/tree/7f2a6b1050d302144de8366afa37a75e46f326aa
+
+La build est annoncée LGPL partagée par son distributeur. Le fichier LICENSE.txt FFmpeg fourni avec ce paquet contient l’avis de licence complet. Le code source correspondant est disponible au lien ci-dessus. Camton Live appelle ffmpeg.exe comme processus distinct et redistribue les DLL FFmpeg avec l’exécutable. Cette notice ne constitue pas un avis juridique.
+
+Camton Live utilise l’encodeur Windows Media Foundation h264_mf et l’encodeur AAC natif de FFmpeg. La build sélectionnée n’est pas la variante GPL statique contenant libx264.
+
+
+OpenH264 — composant disponible dans la build FFmpeg tierce (`--enable-libopenh264`); Camton Live sélectionne `h264_mf` et ne l’utilise pas comme solution de repli.
+Copyright (c) 2013, Cisco Systems. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+OpenH264 source and license: https://github.com/cisco/openh264 and https://github.com/cisco/openh264/blob/master/LICENSE. Cisco’s FAQ distinguishes its own downloadable binary module from integrations built from source; no claim is made here that Cisco’s separate patent-fee coverage applies to the FFmpeg build. Source: https://www.openh264.org/faq.html. This notice is not legal advice.

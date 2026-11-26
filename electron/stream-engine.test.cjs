@@ -1,0 +1,197 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const fsp = require('node:fs/promises');
+const os = require('node:os');
+const path = require('node:path');
+const {
+  createStreamEngine, PROFILES, destinationFor, buildFfmpegArgs, safeFailureMessage,
+} = require('./stream-engine.cjs');
+
+const CREDENTIALS = Object.freeze({
+  twitch: { key: 'live_1234567890_abcdef' },
+  youtube: { endpoint: 'rtmps://a.rtmps.youtube.com:443/live2', key: 'abcd-efgh-ijkl-mnop' },
+});
+
+const ENCODERS = `Encoders:
+ V..... = Video
+ A..... = Audio
+ ------
+ V....D h264_mf              H264 via MediaFoundation (codec h264)
+ A....D aac                  AAC (Advanced Audio Coding)`;
+
+function ffmpegStub({ encoders = ENCODERS, fail = '' } = {}) {
+  const probe = `if [ "$1" = "-hide_banner" ] && [ "$2" = "-encoders" ]; then
+  cat <<'LIST'
+${encoders}
+LIST
+  exit 0
+fi`;
+  const body = fail
+    ? `printf '%s\\n' "${fail}" >&2
+exit 1`
+    : `printf 'frame=1\\n'
+cat > /dev/null
+printf 'frame=2\\n'
+exit 0`;
+  return `#!/bin/sh
+${probe}
+${body}
+`;
+}
+
+function harness(t, options = {}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'camton-engine-'));
+  const executable = path.join(dir, 'ffmpeg');
+  fs.writeFileSync(executable, ffmpegStub(options), { mode: 0o755 });
+  const events = [];
+  const engine = createStreamEngine({
+    app: { isPackaged: false },
+    emit: (event) => events.push(event),
+    deps: { platform: 'win32', arch: 'x64', resolveExecutable: () => executable },
+  });
+  t.after(async () => {
+    await engine.stop().catch(() => {});
+    await fsp.rm(dir, { recursive: true, force: true });
+  });
+  return { engine, events, executable };
+}
+
+function waitFor(events, predicate, timeoutMs = 5000) {
+  return new Promise((resolve, reject) => {
+    const startedAt = Date.now();
+    const poll = () => {
+      const match = events.find(predicate);
+      if (match) { resolve(match); return; }
+      if (Date.now() - startedAt > timeoutMs) { reject(new Error('Événement de diffusion attendu mais absent.')); return; }
+      setTimeout(poll, 10);
+    };
+    poll();
+  });
+}
+
+test('each profile drives resolution, frame rate and bitrate in the encoder arguments', () => {
+  for (const [name, profile] of Object.entries(PROFILES)) {
+    const args = buildFfmpegArgs(profile, 'rtmp://ingest.example/app/key');
+    assert.equal(args.at(-1), 'rtmp://ingest.example/app/key', `${name} doit terminer par la destination`);
+    assert.equal(args[args.indexOf('-b:v') + 1], `${profile.bitrate}k`);
+    assert.equal(args[args.indexOf('-maxrate') + 1], `${profile.bitrate}k`);
+    const filter = args[args.indexOf('-vf') + 1];
+    assert.match(filter, new RegExp(`scale=${profile.width}:${profile.height}`));
+    assert.match(filter, new RegExp(`fps=${profile.fps}`));
+    assert.equal(args[args.indexOf('-g') + 1], String(profile.fps * 2));
+  }
+});
+
+test('the stream is re-encoded to H.264/AAC with optional audio and FLV output', () => {
+  const args = buildFfmpegArgs(PROFILES.balanced, 'rtmps://live.twitch.tv:443/app/key');
+  assert.equal(args[args.indexOf('-c:v') + 1], 'h264_mf');
+  assert.equal(args[args.indexOf('-c:a') + 1], 'aac');
+  assert.equal(args[args.indexOf('-map') + 1], '0:v:0');
+  assert.ok(args.includes('0:a:0?'), 'l’audio de la source reste optionnel');
+  assert.equal(args[args.lastIndexOf('-f') + 1], 'flv');
+  assert.equal(args[args.indexOf('-f') + 1], 'webm', 'le WebM produit par MediaRecorder est décodé');
+});
+
+test('destinations are built from the encrypted credentials only', () => {
+  assert.equal(destinationFor('twitch', CREDENTIALS), 'rtmps://live.twitch.tv:443/app/live_1234567890_abcdef');
+  assert.equal(destinationFor('youtube', CREDENTIALS), 'rtmps://a.rtmps.youtube.com:443/live2/abcd-efgh-ijkl-mnop');
+  assert.throws(() => destinationFor('twitch', {}), /incomplets/);
+  assert.throws(() => destinationFor('youtube', { youtube: { endpoint: 'rtmps://a.rtmps.youtube.com:443/live2' } }), /incomplets/);
+});
+
+test('encoder failures are translated into messages without leaking the key', () => {
+  const key = CREDENTIALS.twitch.key;
+  const unauthorized = safeFailureMessage(`HTTP error 401 Unauthorized for rtmps://live.twitch.tv:443/app/${key}`);
+  assert.match(unauthorized, /refusé la clé/);
+  assert.ok(!unauthorized.includes(key));
+  assert.match(safeFailureMessage('Failed to resolve hostname live.twitch.tv'), /Connexion impossible/);
+  assert.match(safeFailureMessage('Conversion failed!'), /L’encodeur a arrêté/);
+});
+
+test('a session starts one encoder per destination, accepts chunks and stops cleanly', async (t) => {
+  const { engine, events } = harness(t);
+  const started = await engine.start({ platforms: ['twitch', 'youtube'], profileName: 'smooth', credentials: CREDENTIALS });
+  assert.deepEqual(started, { platforms: ['twitch', 'youtube'], profile: 'smooth' });
+  assert.equal(engine.isActive(), true);
+
+  for (const platform of ['twitch', 'youtube']) {
+    const encoding = await waitFor(events, (event) => event.platform === platform && event.status === 'encoding');
+    assert.match(encoding.message, /Encodage local actif/);
+    assert.ok(events.some((event) => event.platform === platform && event.status === 'connecting'));
+  }
+
+  const result = await engine.pushChunk(new Uint8Array([1, 2, 3, 4]).buffer);
+  assert.deepEqual(result, { accepted: true, failedOutputs: 0 });
+
+  await engine.stop();
+  assert.equal(engine.isActive(), false);
+  for (const platform of ['twitch', 'youtube']) {
+    assert.ok(events.some((event) => event.platform === platform && event.status === 'stopped'));
+  }
+  await assert.rejects(engine.pushChunk(new Uint8Array([1]).buffer), /Aucune sortie/);
+});
+
+test('an encoder that exits reports its destination and releases the session', async (t) => {
+  const { engine, events } = harness(t, { fail: 'HTTP error 401 Unauthorized' });
+  await engine.start({ platforms: ['twitch'], profileName: 'balanced', credentials: CREDENTIALS });
+  const failure = await waitFor(events, (event) => event.status === 'error');
+  assert.equal(failure.platform, 'twitch');
+  assert.match(failure.message, /refusé la clé/);
+  assert.equal(engine.isActive(), false);
+});
+
+test('a destination without credentials aborts before any encoder is spawned', async (t) => {
+  const { engine, events } = harness(t);
+  await assert.rejects(
+    engine.start({ platforms: ['twitch', 'youtube'], profileName: 'balanced', credentials: { twitch: CREDENTIALS.twitch } }),
+    /incomplets/,
+  );
+  assert.equal(engine.isActive(), false);
+  assert.equal(events.length, 0);
+});
+
+test('duplicate, unknown, empty and concurrent sessions are refused', async (t) => {
+  const { engine } = harness(t);
+  await assert.rejects(engine.start({ platforms: ['twitch', 'twitch'], profileName: 'balanced', credentials: CREDENTIALS }), /deux fois/);
+  await assert.rejects(engine.start({ platforms: ['tiktok'], profileName: 'balanced', credentials: CREDENTIALS }), /non prise en charge/);
+  await assert.rejects(engine.start({ platforms: [], profileName: 'balanced', credentials: CREDENTIALS }), /Sélectionne Twitch/);
+  await assert.rejects(engine.start({ platforms: ['twitch'], profileName: 'ultra', credentials: CREDENTIALS }), /Préréglage vidéo inconnu/);
+
+  await engine.start({ platforms: ['twitch'], profileName: 'balanced', credentials: CREDENTIALS });
+  await assert.rejects(engine.start({ platforms: ['twitch'], profileName: 'balanced', credentials: CREDENTIALS }), /déjà en cours/);
+  await engine.stop();
+});
+
+test('a build without the Media Foundation encoder is rejected before going live', async (t) => {
+  const { engine } = harness(t, { encoders: ENCODERS.replace(/^.*h264_mf.*$/m, '') });
+  await assert.rejects(engine.start({ platforms: ['twitch'], profileName: 'balanced', credentials: CREDENTIALS }), /H\.264 Media Foundation est absent/);
+  assert.equal(engine.isActive(), false);
+});
+
+test('a build without the AAC encoder is rejected before going live', async (t) => {
+  const { engine } = harness(t, { encoders: ENCODERS.replace(/^.*A\.\.\.\.D aac.*$/m, '') });
+  await assert.rejects(engine.start({ platforms: ['twitch'], profileName: 'balanced', credentials: CREDENTIALS }), /audio AAC est absent/);
+});
+
+test('the engine refuses to run outside the Windows x64 application', async () => {
+  const events = [];
+  const engine = createStreamEngine({
+    app: { isPackaged: false },
+    emit: (event) => events.push(event),
+    deps: { platform: 'linux', arch: 'x64', resolveExecutable: () => '/nonexistent/ffmpeg' },
+  });
+  await assert.rejects(engine.start({ platforms: ['twitch'], profileName: 'balanced', credentials: CREDENTIALS }), /Windows x64/);
+  assert.equal(engine.isActive(), false);
+});
+
+test('a missing FFmpeg binary is reported with the packaging hint', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'camton-engine-missing-'));
+  t.after(() => fsp.rm(dir, { recursive: true, force: true }));
+  const engine = createStreamEngine({
+    app: { isPackaged: true },
+    emit: () => {},
+    deps: { platform: 'win32', arch: 'x64', resolveExecutable: () => path.join(dir, 'ffmpeg.exe') },
+  });
+  await assert.rejects(engine.start({ platforms: ['twitch'], profileName: 'balanced', credentials: CREDENTIALS }), /FFmpeg absent/);
+});

@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a0913" />
+    <meta name="description" content="Camton Live — studio de streaming pour Windows : prépare ta source, ton son et tes destinations, puis envoie ton direct vers Twitch et YouTube." />
+    <link rel="icon" type="image/png" sizes="512x512" href="/camton-live-logo.png" />
+    <title>Camton Live — Ton studio de live</title>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar" aria-label="Navigation principale">
+        <a class="brand" href="#studio" aria-label="Camton Live, retour au studio">
+          <span class="brand-logo"><img src="/camton-live-logo.png" alt="" /></span>
+          <span class="brand-text"><strong>Camton Live</strong><small>Studio de live</small></span>
+        </a>
+
+        <p class="sidebar-caption">Espace créateur</p>
+        <nav class="nav" aria-label="Sections du studio">
+          <a class="nav-item active" href="#studio" data-nav="studio"><span class="nav-glyph" aria-hidden="true">◉</span><span class="nav-label">Studio</span></a>
+          <a class="nav-item" href="#source" data-nav="source"><span class="nav-glyph" aria-hidden="true">▣</span><span class="nav-label">Source vidéo</span><span class="nav-check" id="navSourceCheck"></span></a>
+          <a class="nav-item" href="#audio" data-nav="audio"><span class="nav-glyph" aria-hidden="true">♫</span><span class="nav-label">Son & micro</span></a>
+          <a class="nav-item" href="#platforms" data-nav="platforms"><span class="nav-glyph" aria-hidden="true">⌁</span><span class="nav-label">Plateformes</span><span class="nav-check" id="navPlatformCheck">0</span></a>
+          <a class="nav-item" href="#quality" data-nav="quality"><span class="nav-glyph" aria-hidden="true">◈</span><span class="nav-label">Qualité</span></a>
+        </nav>
+
+        <div class="sidebar-spacer"></div>
+        <div class="sidebar-help">
+          <span class="sidebar-help-mark" aria-hidden="true">?</span>
+          <p><strong>Besoin d’un coup de main&nbsp;?</strong><br />Chaque étape est expliquée, sans jargon.</p>
+          <button class="link-button" id="helpBtn" type="button">Voir le guide <span aria-hidden="true">↗</span></button>
+        </div>
+        <p class="sidebar-foot"><span class="status-dot ready" aria-hidden="true"></span> Clés chiffrées sur cet appareil</p>
+      </aside>
+
+      <div class="workspace">
+        <header class="topbar">
+          <p class="crumbs"><span>Camton Live</span><span class="crumbs-sep" aria-hidden="true">/</span><strong>Studio</strong></p>
+          <div class="topbar-tools">
+            <span class="pill"><span class="pill-dot" aria-hidden="true"></span> Bêta 0.4</span>
+            <button class="icon-button" id="helpTopBtn" type="button" aria-label="Ouvrir le guide" title="Guide">?</button>
+            <span class="avatar"><img src="/camton-live-logo.png" alt="Camton Live" /></span>
+          </div>
+        </header>
+
+        <main class="canvas" id="studio">
+          <section class="hero">
+            <div class="hero-copy">
+              <p class="eyebrow">Ton espace de création</p>
+              <h1>Prêt·e à passer <em>en live</em>&nbsp;?</h1>
+              <p class="hero-sub">Prépare ta source, ton son et tes destinations. Tu gardes le contrôle à chaque étape.</p>
+            </div>
+            <div class="session-card">
+              <span class="session-icon" aria-hidden="true">◷</span>
+              <span class="session-text"><small>Session</small><strong id="sessionTime">Pas démarrée</strong></span>
+            </div>
+          </section>
+
+          <ol class="checklist" aria-label="Étapes de préparation">
+            <li class="checklist-step current"><a href="#source" data-step="1"><span class="checklist-num">01</span><span class="checklist-copy"><strong>Ta source</strong><small>Image du jeu</small></span></a></li>
+            <li class="checklist-step"><a href="#audio" data-step="2"><span class="checklist-num">02</span><span class="checklist-copy"><strong>Ton son</strong><small>Jeu & micro</small></span></a></li>
+            <li class="checklist-step"><a href="#platforms" data-step="3"><span class="checklist-num">03</span><span class="checklist-copy"><strong>Où tu diffuses</strong><small>Destinations</small></span></a></li>
+            <li class="checklist-step"><a href="#quality" data-step="4"><span class="checklist-num">04</span><span class="checklist-copy"><strong>On vérifie</strong><small>Avant l’envoi</small></span></a></li>
+          </ol>
+
+          <aside class="notice" id="demoBanner">
+            <span class="notice-mark" aria-hidden="true">i</span>
+            <p><strong>Bêta 0.4 : Twitch et YouTube, avec tes propres clés.</strong> L’aperçu reste local. Le direct réel exige une clé valide et un compte autorisé. YouTube peut exiger un événement déjà créé et démarré dans Studio&nbsp;; TikTok n’est pas pris en charge.</p>
+            <button class="icon-button icon-button--ghost" id="dismissBanner" type="button" aria-label="Masquer cette information">×</button>
+          </aside>
+
+          <section class="section" id="source" aria-labelledby="sourceTitle">
+            <header class="section-head">
+              <span class="section-index">01</span>
+              <div class="section-title">
+                <h2 id="sourceTitle">Ta source vidéo</h2>
+                <p>Choisis ce que ton public verra à l’écran.</p>
+              </div>
+              <span class="section-status" id="sourceSectionStatus"><span class="status-dot muted"></span> À configurer</span>
+            </header>
+
+            <div class="source-grid">
+              <article class="panel preview-panel">
+                <header class="panel-head">
+                  <div><p class="overline">Aperçu du studio</p><h3>Voilà ce que ton public verra</h3></div>
+                  <span class="preview-tag" id="previewTag"><i aria-hidden="true"></i> Aperçu inactif</span>
+                </header>
+                <div class="preview-frame" id="previewFrame">
+                  <video id="previewVideo" autoplay playsinline muted aria-label="Aperçu de la source vidéo"></video>
+                  <div class="preview-placeholder" id="previewPlaceholder">
+                    <span class="preview-ring" aria-hidden="true">
+                      <svg viewBox="0 0 48 48"><rect x="6" y="10" width="26" height="28" rx="4" /><path d="m32 20 10-6v20l-10-6" /></svg>
+                    </span>
+                    <strong>Ton aperçu apparaîtra ici</strong>
+                    <span>Commence par choisir une source à droite.</span>
+                    <span class="preview-skeleton" aria-hidden="true"><i></i><i></i><i></i></span>
+                  </div>
+                  <div class="preview-overlay" id="previewOverlay">
+                    <span class="overlay-source"><i aria-hidden="true"></i><b id="previewSourceName">Source active</b></span>
+                    <button class="overlay-stop" id="stopPreviewBtn" type="button" title="Arrêter l’aperçu" aria-label="Arrêter l’aperçu">■</button>
+                  </div>
+                </div>
+                <footer class="preview-foot">
+                  <span class="preview-status"><span class="status-dot muted" id="sourceDot"></span><span id="sourceStatus">Aucune source sélectionnée</span></span>
+                  <span class="resolution" id="resolutionLabel">— × — · — i/s</span>
+                </footer>
+              </article>
+
+              <article class="panel source-panel">
+                <header class="panel-head">
+                  <div><p class="overline">Étape 1 sur 4</p><h3>D’où vient ton jeu&nbsp;?</h3></div>
+                </header>
+                <div class="tabs" role="tablist" aria-label="Type de source">
+                  <button class="source-tab active" role="tab" aria-selected="true" data-source-tab="pc" type="button"><span class="tab-glyph" aria-hidden="true">▣</span><span><strong>Mon PC</strong><small>Écran, fenêtre ou jeu</small></span></button>
+                  <button class="source-tab" role="tab" aria-selected="false" data-source-tab="xbox" type="button"><span class="tab-glyph tab-glyph--xbox" aria-hidden="true">X</span><span><strong>Ma Xbox</strong><small>Carte de capture</small></span></button>
+                </div>
+
+                <div class="tab-body" id="pcSourceBody">
+                  <p class="hint"><span class="hint-mark" aria-hidden="true">A</span><span>Partage l’écran, une fenêtre ou ton jeu. <strong>Tu choisis quoi partager</strong> dans le sélecteur Windows.</span></p>
+                  <button class="button button-primary button-block" id="capturePcBtn" type="button"><span aria-hidden="true">▧</span> Choisir mon écran / jeu <span class="button-arrow" aria-hidden="true">→</span></button>
+                  <p class="microcopy"><span aria-hidden="true">⌑</span> Windows te demandera une autorisation de partage.</p>
+                </div>
+
+                <div class="tab-body hidden" id="xboxSourceBody">
+                  <div class="diagram" aria-hidden="true">
+                    <span class="diagram-node"><b>X</b><small>Xbox</small></span>
+                    <span class="diagram-link"></span>
+                    <span class="diagram-node"><b>▤</b><small>Capture</small></span>
+                    <span class="diagram-link"></span>
+                    <span class="diagram-node"><b>▣</b><small>PC USB</small></span>
+                  </div>
+                  <p class="hint"><span class="hint-mark" aria-hidden="true">1</span><span><strong>Xbox → carte de capture → PC en USB.</strong> Branche le HDMI de la Xbox sur l’entrée de la carte, puis relie la carte au PC.</span></p>
+                  <label class="field-label" for="captureCardSelect">Périphérique vidéo détecté</label>
+                  <div class="field-row">
+                    <select id="captureCardSelect"><option value="">Aucun appareil listé</option></select>
+                    <button class="button button-secondary" id="scanBtn" type="button" title="Détecter les appareils">↻ <span>Scanner</span></button>
+                  </div>
+                  <button class="button button-secondary button-block" id="connectCardBtn" type="button"><span aria-hidden="true">▧</span> Tester la carte de capture</button>
+                  <p class="microcopy" id="captureHelp">La carte apparaît généralement comme une caméra USB. Une carte HDMI est nécessaire&nbsp;; le câble HDMI seul ne suffit pas.</p>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section class="section" id="audio" aria-labelledby="audioTitle">
+            <header class="section-head">
+              <span class="section-index">02</span>
+              <div class="section-title">
+                <h2 id="audioTitle">Ton son & ton micro</h2>
+                <p>Le micro est nécessaire pour démarrer un direct.</p>
+              </div>
+              <span class="section-status" id="audioSectionStatus"><span class="status-dot muted"></span> À tester</span>
+            </header>
+
+            <div class="panel audio-panel">
+              <div class="audio-col">
+                <div class="audio-head">
+                  <span class="audio-glyph" aria-hidden="true">♫</span>
+                  <div><h3>Son de la source</h3><p>Mélangé quand il est disponible.</p></div>
+                </div>
+                <div class="audio-signal-row">
+                  <span class="signal-led" id="gameAudioLed" aria-hidden="true"></span>
+                  <span class="meter" aria-hidden="true"><span class="meter-fill" id="gameAudioLevel"></span></span>
+                  <span class="audio-caption" id="gameAudioStatus">En attente</span>
+                </div>
+                <p class="audio-note">Le son d’écran dépend de Windows et de la carte&nbsp;; le microphone reste requis.</p>
+              </div>
+
+              <div class="audio-divider" aria-hidden="true"></div>
+
+              <div class="audio-col">
+                <div class="audio-head">
+                  <span class="audio-glyph audio-glyph--mic" aria-hidden="true">♩</span>
+                  <div><h3>Ton micro</h3><p>Choisis le micro que ton public entendra.</p></div>
+                </div>
+                <div class="field-row">
+                  <select id="micSelect" aria-label="Sélectionner le microphone"><option value="">Micro par défaut</option></select>
+                  <button class="button button-secondary" id="micTestBtn" type="button"><span id="micButtonIcon" aria-hidden="true">▷</span> Tester mon micro</button>
+                </div>
+                <div class="audio-signal-row">
+                  <span class="signal-led" id="micLed" aria-hidden="true"></span>
+                  <span class="meter" aria-hidden="true"><span class="meter-fill" id="micLevel"></span></span>
+                  <span class="audio-caption" id="micStatus">Pas encore testé</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="section" id="platforms" aria-labelledby="platformsTitle">
+            <header class="section-head">
+              <span class="section-index">03</span>
+              <div class="section-title">
+                <h2 id="platformsTitle">Où veux-tu diffuser&nbsp;?</h2>
+                <p>Configure tes clés, puis sélectionne une ou plusieurs destinations.</p>
+              </div>
+              <span class="section-status" id="platformSectionStatus"><span class="status-dot muted"></span> Aucune clé configurée</span>
+            </header>
+
+            <div class="platform-grid">
+              <article class="platform-card" data-platform-card="youtube">
+                <header class="platform-top">
+                  <span class="platform-logo platform-logo--youtube" aria-hidden="true">▶</span>
+                  <span class="connection-badge" id="youtubeBadge"><i aria-hidden="true"></i><span>À configurer</span></span>
+                </header>
+                <h3>YouTube</h3>
+                <p>Envoie le flux au point d’ingestion fourni dans YouTube Studio.</p>
+                <label class="platform-select"><input type="checkbox" data-platform="youtube" /><span class="custom-check" aria-hidden="true"></span><span>Ajouter à mon live</span></label>
+                <button class="platform-info" data-platform-info="youtube" type="button">Configurer YouTube <span aria-hidden="true">↗</span></button>
+              </article>
+
+              <article class="platform-card" data-platform-card="twitch">
+                <header class="platform-top">
+                  <span class="platform-logo platform-logo--twitch" aria-hidden="true">▰</span>
+                  <span class="connection-badge" id="twitchBadge"><i aria-hidden="true"></i><span>À configurer</span></span>
+                </header>
+                <h3>Twitch</h3>
+                <p>Envoie le flux à Twitch avec ta clé personnelle.</p>
+                <label class="platform-select"><input type="checkbox" data-platform="twitch" /><span class="custom-check" aria-hidden="true"></span><span>Ajouter à mon live</span></label>
+                <button class="platform-info" data-platform-info="twitch" type="button">Configurer Twitch <span aria-hidden="true">↗</span></button>
+              </article>
+
+              <article class="platform-card platform-card--off" data-platform-card="tiktok">
+                <header class="platform-top">
+                  <span class="platform-logo platform-logo--tiktok" aria-hidden="true">♪</span>
+                  <span class="connection-badge unavailable"><i aria-hidden="true"></i><span>Indisponible</span></span>
+                </header>
+                <h3>TikTok LIVE</h3>
+                <p>Non pris en charge dans la bêta Camton Live 0.4.</p>
+                <label class="platform-select"><input type="checkbox" data-platform="tiktok" disabled /><span class="custom-check" aria-hidden="true"></span><span>Indisponible en 0.4</span></label>
+                <button class="platform-info" data-platform-info="tiktok" type="button">Pourquoi&nbsp;? <span aria-hidden="true">↗</span></button>
+              </article>
+            </div>
+
+            <p class="disclaimer"><span class="disclaimer-mark" aria-hidden="true">!</span> Camton Live chiffre tes clés localement sur Windows et ne demande jamais le mot de passe d’une plateforme. « Encodage actif » indique un encodage local&nbsp;; vérifie la réception dans la plateforme et l’état de l’événement dans YouTube Studio.</p>
+          </section>
+
+          <section class="section" id="quality" aria-labelledby="qualityTitle">
+            <header class="section-head">
+              <span class="section-index">04</span>
+              <div class="section-title">
+                <h2 id="qualityTitle">Choisis ta qualité</h2>
+                <p>Ces réglages sont appliqués à l’encodeur Windows.</p>
+              </div>
+              <span class="section-status"><span class="status-dot ready"></span> Préréglages appliqués</span>
+            </header>
+
+            <div class="panel quality-panel">
+              <div class="quality-head">
+                <span class="quality-glyph" aria-hidden="true">◈</span>
+                <div><h3>Quel niveau de détail tu veux&nbsp;?</h3><p>En multistream, chaque destination a son propre encodeur&nbsp;; commence modestement.</p></div>
+              </div>
+              <div class="quality-options" role="radiogroup" aria-label="Qualité de diffusion">
+                <label class="quality-option"><input type="radio" name="quality" value="smooth" /><span class="radio-dot" aria-hidden="true"></span><span class="quality-copy"><strong>Fluide</strong><small>720p · 30 i/s · ~3 Mb/s</small></span><span class="quality-tag">Connexion modeste</span></label>
+                <label class="quality-option selected"><input type="radio" name="quality" value="balanced" checked /><span class="radio-dot" aria-hidden="true"></span><span class="quality-copy"><strong>Équilibré</strong><small>720p · 60 i/s · ~4,5 Mb/s</small></span><span class="quality-tag quality-tag--recommended">Conseillé</span></label>
+                <label class="quality-option"><input type="radio" name="quality" value="sharp" /><span class="radio-dot" aria-hidden="true"></span><span class="quality-copy"><strong>Très net</strong><small>1080p · 60 i/s · ~6 Mb/s</small></span><span class="quality-tag">PC solide</span></label>
+              </div>
+            </div>
+          </section>
+
+          <footer class="page-footer">
+            <span>Camton Live <b aria-hidden="true">·</b> Bêta 0.4.3</span>
+            <span>Les clés restent chiffrées sur l’appareil&nbsp;; le flux n’est envoyé qu’après ton action.</span>
+            <button class="link-button" id="privacyBtn" type="button">Confidentialité</button>
+          </footer>
+        </main>
+
+        <section class="dock" aria-label="Contrôle du direct">
+          <div class="dock-status">
+            <span class="status-dot muted" id="streamDot" aria-hidden="true"></span>
+            <div class="dock-status-copy"><small>État du direct</small><strong id="streamStatus">Aucun direct en cours</strong></div>
+            <strong class="dock-timer hidden" id="demoTimer">00:00</strong>
+          </div>
+          <p class="dock-hint" id="readinessText">Configure une destination, choisis une source et vérifie ton micro.</p>
+          <div class="dock-actions">
+            <button class="button button-secondary" id="demoBtn" type="button"><span aria-hidden="true">▷</span> Essayer la démo locale</button>
+            <button class="button button-primary start-live-button" id="startLiveBtn" type="button">Démarrer un direct <span aria-hidden="true">→</span></button>
+          </div>
+          <p class="dock-note"><span aria-hidden="true">ⓘ</span> <span id="bitrateNotice">Sélectionne une ou plusieurs destinations pour estimer le débit sortant.</span></p>
+        </section>
+      </div>
+    </div>
+
+    <section class="update-notice hidden" id="updateNotice" role="region" aria-labelledby="updateTitle" aria-live="polite">
+      <div class="update-mark" aria-hidden="true">↻</div>
+      <div class="update-body">
+        <p class="overline">Camton Live · Mise à jour</p>
+        <h2 id="updateTitle">Mise à jour disponible</h2>
+        <p id="updateMessage"></p>
+        <div class="update-progress hidden" id="updateProgressTrack" aria-label="Progression du téléchargement"><span id="updateProgressBar"></span></div>
+        <div class="update-actions">
+          <button class="button button-primary" id="updateAction" type="button">Télécharger</button>
+          <button class="button button-secondary" id="updateDismiss" type="button">Plus tard</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"><span class="toast-mark" aria-hidden="true">✓</span><span id="toastText"></span></div>
+
+    <div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <button class="modal-close" id="modalClose" type="button" aria-label="Fermer">×</button>
+        <span class="modal-mark" id="modalMark" aria-hidden="true">i</span>
+        <p class="overline" id="modalEyebrow">À savoir</p>
+        <h2 id="modalTitle">Information</h2>
+        <div class="modal-copy" id="modalCopy"></div>
+        <button class="button button-primary modal-action" id="modalOk" type="button">J’ai compris</button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

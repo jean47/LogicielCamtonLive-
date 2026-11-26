@@ -1,0 +1,1088 @@
+import { LIVE_PROFILES, PLATFORM_DETAILS, PLATFORM_IDS } from './platforms.js';
+import './styles/index.css';
+
+const $ = (selector, root = document) => root.querySelector(selector);
+const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+const desktop = window.lumaCastDesktop;
+
+function readArray(key, fallbackKey = null) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || (fallbackKey ? localStorage.getItem(fallbackKey) : 'null') || '[]');
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
+const storedPlatforms = readArray('lumacast-platforms', 'sf-platforms').filter((id) => PLATFORM_IDS.includes(id));
+const state = {
+  sourceTab: 'pc',
+  sourceStream: null,
+  micStream: null,
+  micDeviceId: '',
+  meterContexts: new Map(),
+  meterFrames: new Map(),
+  timerInterval: null,
+  demoStartedAt: null,
+  demoRunning: false,
+  selectedPlatforms: new Set(storedPlatforms),
+  quality: localStorage.getItem('lumacast-quality') || localStorage.getItem('sf-quality') || 'balanced',
+  credentialStatus: { available: false, twitch: false, youtube: false },
+  streamStatuses: {},
+  isStreaming: false,
+  isStarting: false,
+  stopRequested: false,
+  mediaRecorder: null,
+  mixedStream: null,
+  mixContext: null,
+  chunkQueue: Promise.resolve(),
+  queuedBytes: 0,
+  toastTimer: null,
+  modalCleanup: null,
+  removeStreamListener: null,
+  updateStatus: { status: 'idle', latestVersion: null, releaseNotes: '', progress: 0 },
+  updateDismissed: false,
+  removeUpdateListener: null,
+};
+
+function showToast(message, type = 'success') {
+  const toast = $('#toast');
+  $('#toastText').textContent = message;
+  $('.toast-mark', toast).textContent = type === 'warning' ? '!' : '✓';
+  toast.classList.toggle('toast-warning', type === 'warning');
+  toast.classList.add('show');
+  clearTimeout(state.toastTimer);
+  state.toastTimer = setTimeout(() => toast.classList.remove('show'), 4200);
+}
+
+function renderUpdateNotice(update = state.updateStatus) {
+  state.updateStatus = update || state.updateStatus;
+  const notice = $('#updateNotice');
+  if (!desktop?.isDesktopApp || state.updateDismissed || !['available', 'downloading', 'downloaded', 'installing', 'error'].includes(state.updateStatus.status)) {
+    notice.classList.add('hidden');
+    return;
+  }
+  const status = state.updateStatus.status;
+  const version = state.updateStatus.latestVersion ? ` · ${state.updateStatus.latestVersion}` : '';
+  const action = $('#updateAction');
+  const progress = $('#updateProgressTrack');
+  $('#updateTitle').textContent = status === 'downloading' ? 'Téléchargement de la mise à jour' : status === 'downloaded' ? 'Mise à jour prête' : status === 'installing' ? 'Installation en cours' : `Mise à jour disponible${version}`;
+  progress.classList.toggle('hidden', status !== 'downloading' || !Number.isFinite(state.updateStatus.progress));
+  if (status === 'downloading') {
+    const percent = Number.isFinite(state.updateStatus.progress) ? state.updateStatus.progress : null;
+    $('#updateMessage').textContent = percent === null ? 'Téléchargement en cours…' : `Téléchargement en cours… ${percent} %`;
+    if (percent !== null) $('#updateProgressBar').style.width = `${percent}%`;
+    action.textContent = 'Téléchargement…';
+    action.disabled = true;
+  } else if (status === 'downloaded') {
+    $('#updateMessage').textContent = state.isStreaming
+      ? 'Le fichier est vérifié. Arrête ton direct pour pouvoir l’installer sans interruption.'
+      : 'Le fichier est vérifié. Installe maintenant et Camton Live redémarrera après la mise à jour.';
+    action.textContent = state.isStreaming ? 'Arrête le direct pour installer' : 'Installer et redémarrer';
+    action.disabled = state.isStreaming;
+  } else if (status === 'installing') {
+    $('#updateMessage').textContent = 'Camton Live va se fermer puis se rouvrir avec la nouvelle version.';
+    action.textContent = 'Fermeture…';
+    action.disabled = true;
+  } else if (status === 'error') {
+    $('#updateMessage').textContent = state.updateStatus.errorMessage || 'Le téléchargement a échoué. Réessaie quand ta connexion sera rétablie.';
+    action.textContent = 'Réessayer';
+    action.disabled = false;
+  } else {
+    const notes = state.updateStatus.releaseNotes?.trim();
+    $('#updateMessage').textContent = notes ? `${notes}\n\nTélécharge-la quand tu es prêt·e; l’installation ne démarrera pas pendant un direct.` : 'Télécharge-la quand tu es prêt·e; l’installation ne démarrera pas pendant un direct.';
+    action.textContent = 'Télécharger la mise à jour';
+    action.disabled = false;
+  }
+  $('#updateDismiss').classList.toggle('hidden', status === 'downloading' || status === 'installing');
+  notice.classList.remove('hidden');
+}
+
+async function handleUpdateAction() {
+  const status = state.updateStatus.status;
+  try {
+    if (status === 'downloaded') {
+      await desktop.installUpdate();
+    } else if (status === 'available' || status === 'error') {
+      await desktop.downloadUpdate();
+    }
+  } catch (error) {
+    state.updateStatus = { ...state.updateStatus, status: 'error', errorMessage: error?.message || 'Impossible de lancer la mise à jour.' };
+    renderUpdateNotice();
+  }
+}
+
+function showModal({ title, eyebrow = 'À SAVOIR', body, items = [], mark = 'i', action = 'J’ai compris' }) {
+  if (state.modalCleanup) {
+    state.modalCleanup();
+    state.modalCleanup = null;
+  }
+  $('#modalTitle').textContent = title;
+  $('#modalEyebrow').textContent = eyebrow;
+  $('#modalMark').textContent = mark;
+  $('#modalOk').textContent = action;
+  $('#modalOk').classList.remove('hidden');
+  const copy = $('#modalCopy');
+  copy.replaceChildren();
+  if (body) {
+    const intro = document.createElement('p');
+    intro.textContent = body;
+    copy.append(intro);
+  }
+  if (items.length) {
+    const list = document.createElement('ul');
+    for (const item of items) {
+      const li = document.createElement('li');
+      li.textContent = item;
+      list.append(li);
+    }
+    copy.append(list);
+  }
+  $('#modalBackdrop').classList.add('open');
+  $('#modalBackdrop').setAttribute('aria-hidden', 'false');
+  $('#modalClose').focus();
+}
+
+function closeModal() {
+  if (state.modalCleanup) {
+    state.modalCleanup();
+    state.modalCleanup = null;
+  }
+  $('#modalBackdrop').classList.remove('open');
+  $('#modalBackdrop').setAttribute('aria-hidden', 'true');
+}
+
+function showDesktopSourcePicker(sources) {
+  $('#modalTitle').textContent = 'Choisis ton écran ou ta fenêtre';
+  $('#modalEyebrow').textContent = 'SOURCE PC';
+  $('#modalMark').textContent = '▣';
+  $('#modalOk').classList.add('hidden');
+  const copy = $('#modalCopy');
+  copy.replaceChildren();
+  const intro = document.createElement('p');
+  intro.textContent = 'Sélectionne uniquement la fenêtre ou l’écran que tu veux afficher dans ton aperçu.';
+  copy.append(intro);
+  const grid = document.createElement('div');
+  grid.className = 'source-picker-grid';
+  sources.forEach((source) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'source-choice-card';
+    const thumbnail = document.createElement('img');
+    thumbnail.alt = '';
+    thumbnail.src = source.thumbnail || '';
+    thumbnail.classList.toggle('missing-thumbnail', !source.thumbnail);
+    const name = document.createElement('span');
+    name.className = 'source-choice-name';
+    name.textContent = source.name;
+    const kind = document.createElement('small');
+    kind.textContent = source.id.startsWith('screen:') ? 'ÉCRAN' : 'FENÊTRE';
+    button.append(thumbnail, name, kind);
+    button.addEventListener('click', () => {
+      closeModal();
+      startDesktopCapture(source);
+    });
+    grid.append(button);
+  });
+  copy.append(grid);
+  $('#modalBackdrop').classList.add('open');
+  $('#modalBackdrop').setAttribute('aria-hidden', 'false');
+  grid.querySelector('button')?.focus();
+}
+
+function setSourceStatus(message, active = false) {
+  $('#sourceStatus').textContent = message;
+  $('#sourceDot').classList.toggle('active', active);
+  $('#sourceDot').classList.toggle('muted', !active);
+  $('#sourceSectionStatus').innerHTML = active
+    ? '<span class="status-dot ready"></span> Source active'
+    : '<span class="status-dot muted"></span> À configurer';
+}
+
+function stopTracks(stream) {
+  if (stream) stream.getTracks().forEach((track) => track.stop());
+}
+
+function stopMeter(meterElement) {
+  const frame = state.meterFrames.get(meterElement);
+  if (frame) cancelAnimationFrame(frame);
+  state.meterFrames.delete(meterElement);
+  const context = state.meterContexts.get(meterElement);
+  if (context) context.close().catch(() => {});
+  state.meterContexts.delete(meterElement);
+  const fill = $('.meter-fill', meterElement.closest('.audio-signal-row'));
+  if (fill) fill.style.width = '0%';
+}
+
+function resetMicUi(message = 'Pas encore testé') {
+  $('#micTestBtn').innerHTML = '<span id="micButtonIcon">▷</span> Tester mon micro';
+  $('#micStatus').textContent = message;
+  $('#micLed').classList.remove('on');
+  $('#micLevel').style.width = '0%';
+  $('#audioSectionStatus').innerHTML = '<span class="status-dot muted"></span> À tester';
+}
+
+function stopSource({ stopMic = true } = {}) {
+  stopTracks(state.sourceStream);
+  state.sourceStream = null;
+  $('#previewVideo').srcObject = null;
+  $('#previewFrame').classList.remove('has-video');
+  $('#previewOverlay').classList.remove('visible');
+  $('#previewPlaceholder').classList.remove('hidden');
+  $('#previewTag').classList.remove('active');
+  $('#previewTag').innerHTML = '<i></i> APERÇU INACTIF';
+  $('#resolutionLabel').textContent = '— × — · — FPS';
+  $('#gameAudioLed').classList.remove('on');
+  $('#gameAudioLevel').style.width = '0%';
+  $('#gameAudioStatus').textContent = 'En attente';
+  stopMeter($('#gameAudioLevel'));
+  setSourceStatus('Aucune source sélectionnée', false);
+  if (stopMic && state.micStream) {
+    stopTracks(state.micStream);
+    state.micStream = null;
+    state.micDeviceId = '';
+    stopMeter($('#micLevel'));
+    resetMicUi();
+  }
+}
+
+function showMediaError(error, noun = 'la source vidéo') {
+  let explanation = `L’application n’a pas pu accéder à ${noun}. Vérifie les autorisations Windows et que l’appareil n’est pas déjà utilisé.`;
+  if (error?.name === 'NotAllowedError' || error?.name === 'PermissionDeniedError') {
+    explanation = 'La capture a été refusée ou interrompue. Choisis de nouveau l’écran ou la fenêtre dans Camton Live. Si le problème persiste, ferme les autres applications de capture et vérifie les paramètres de confidentialité de Windows.';
+  } else if (error?.name === 'NotFoundError' || error?.name === 'DevicesNotFoundError') {
+    explanation = 'Aucun appareil compatible n’a été trouvé. Branche la carte de capture ou le micro, puis réessaie.';
+  } else if (error?.name === 'NotReadableError') {
+    explanation = 'L’appareil semble déjà utilisé par une autre application. Ferme-la puis réessaie.';
+  }
+  showModal({ title: `Impossible d’accéder à ${noun}`, eyebrow: 'AUTORISATION APPAREIL', body: explanation, mark: '!', action: 'Compris' });
+}
+
+async function startPreview(stream, label) {
+  if (state.isStreaming) await stopLive();
+  stopSource();
+  state.sourceStream = stream;
+  const video = $('#previewVideo');
+  video.srcObject = stream;
+  $('#previewPlaceholder').classList.add('hidden');
+  $('#previewFrame').classList.add('has-video');
+  $('#previewOverlay').classList.add('visible');
+  $('#previewSourceName').textContent = label.toUpperCase();
+  $('#previewTag').classList.add('active');
+  $('#previewTag').innerHTML = '<i></i> APERÇU ACTIF';
+  const videoTrack = stream.getVideoTracks()[0];
+  const settings = videoTrack?.getSettings?.() || {};
+  const width = settings.width || 0;
+  const height = settings.height || 0;
+  const fps = settings.frameRate ? Math.round(settings.frameRate) : 30;
+  $('#resolutionLabel').textContent = width && height ? `${width} × ${height} · ${fps} FPS` : `Aperçu local · ${fps} FPS`;
+  setSourceStatus(`${label} — aperçu en cours`, true);
+  $('#gameAudioStatus').textContent = stream.getAudioTracks().length ? 'Son de la source' : 'Pas de son système';
+  $('#gameAudioLed').classList.toggle('on', !!stream.getAudioTracks().length);
+  if (stream.getAudioTracks().length) beginMeter(stream, $('#gameAudioLevel'));
+  videoTrack?.addEventListener('ended', () => {
+    if (state.sourceStream !== stream) return;
+    if (state.isStreaming) {
+      showToast('Le partage de la source s’est arrêté; le direct est fermé.', 'warning');
+      stopLive({ fromFailure: true });
+      return;
+    }
+    stopSource();
+    showToast('Le partage de la source a été arrêté.', 'warning');
+  }, { once: true });
+  $('#readinessText').textContent = 'Aperçu local prêt. Configure une destination et vérifie ton micro pour diffuser.';
+  $('#navSourceCheck').textContent = '✓';
+  $('#navSourceCheck').classList.add('done');
+  showToast('Aperçu local activé. Rien n’est encore envoyé aux plateformes.');
+  await video.play().catch(() => {});
+}
+
+function beginMeter(stream, meterElement) {
+  stopMeter(meterElement);
+  const audioTrack = stream.getAudioTracks()[0];
+  if (!audioTrack) return;
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    const context = new AudioContextClass();
+    const input = context.createMediaStreamSource(new MediaStream([audioTrack]));
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 256;
+    input.connect(analyser);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    state.meterContexts.set(meterElement, context);
+    const draw = () => {
+      if (state.meterContexts.get(meterElement) !== context) return;
+      analyser.getByteTimeDomainData(data);
+      let sum = 0;
+      for (const value of data) {
+        const normalized = (value - 128) / 128;
+        sum += normalized * normalized;
+      }
+      const rms = Math.sqrt(sum / data.length);
+      meterElement.style.width = `${Math.min(100, Math.max(3, Math.round(rms * 360)))}%`;
+      state.meterFrames.set(meterElement, requestAnimationFrame(draw));
+    };
+    draw();
+  } catch {
+    // Le niveau audio est seulement informatif; la capture peut continuer sans vu-mètre.
+  }
+}
+
+async function loadDevices({ requestPermission = false } = {}) {
+  const captureSelect = $('#captureCardSelect');
+  const micSelect = $('#micSelect');
+  if (!navigator.mediaDevices?.enumerateDevices) {
+    showToast('La détection nécessite une version récente de Windows et de l’application.', 'warning');
+    return;
+  }
+  if (requestPermission) {
+    try {
+      const permissionStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      stopTracks(permissionStream);
+    } catch {
+      // Les noms restent parfois masqués tant que l’autorisation n’est pas accordée.
+    }
+  }
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videos = devices.filter((device) => device.kind === 'videoinput');
+    const audios = devices.filter((device) => device.kind === 'audioinput');
+    captureSelect.replaceChildren();
+    if (!videos.length) captureSelect.add(new Option('Aucun appareil vidéo détecté', ''));
+    else {
+      captureSelect.add(new Option('Choisir un appareil vidéo…', ''));
+      videos.forEach((device, index) => captureSelect.add(new Option(device.label || `Caméra / carte de capture ${index + 1}`, device.deviceId)));
+    }
+    const selectedMic = $('#micSelect').value;
+    micSelect.replaceChildren(new Option('Micro par défaut', ''));
+    audios.forEach((device, index) => micSelect.add(new Option(device.label || `Microphone ${index + 1}`, device.deviceId)));
+    if (selectedMic && audios.some((device) => device.deviceId === selectedMic)) micSelect.value = selectedMic;
+    $('#captureHelp').textContent = videos.length
+      ? `${videos.length} appareil${videos.length > 1 ? 's' : ''} vidéo détecté${videos.length > 1 ? 's' : ''}. Choisis ta carte dans la liste.`
+      : 'Aucune caméra ou carte listée. Branche-la en USB, vérifie le HDMI IN, puis scanne à nouveau.';
+    if (requestPermission) showToast(videos.length ? 'Liste des sources actualisée.' : 'Aucun appareil vidéo détecté. Vérifie le branchement USB.', videos.length ? 'success' : 'warning');
+  } catch {
+    showToast('Impossible de lire la liste des appareils. Vérifie les autorisations Windows.', 'warning');
+  }
+}
+
+async function startCaptureCard() {
+  if (!desktop?.isDesktopApp) {
+    showModal({ title: 'Utilise Camton Live pour Windows', body: 'La capture USB est désactivée dans l’aperçu du navigateur. Ouvre l’application portable Windows pour accéder aux appareils.', mark: '!' });
+    return;
+  }
+  const deviceId = $('#captureCardSelect').value;
+  if (!deviceId) {
+    await loadDevices({ requestPermission: true });
+    if (!$('#captureCardSelect').value) {
+      if ($('#captureCardSelect').options.length > 1) showToast('Sélectionne ta carte USB dans la liste, puis réessaie.', 'warning');
+      else showModal({ title: 'Branche ta carte de capture', eyebrow: 'SOURCE XBOX', body: 'Relie la sortie HDMI de ta Xbox à l’entrée HDMI IN de la carte, puis branche la carte en USB sur ton PC. Un câble HDMI seul ne suffit généralement pas.', items: ['Vérifie que la carte est alimentée et reconnue par Windows.', 'Elle peut apparaître comme une caméra USB.', 'Tu peux utiliser l’aperçu local avant d’envoyer quoi que ce soit.'], mark: 'X' });
+      return;
+    }
+  }
+  const selectedDevice = $('#captureCardSelect').value || deviceId;
+  try {
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: selectedDevice }, frameRate: { ideal: 30 } }, audio: true });
+    } catch {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: selectedDevice }, frameRate: { ideal: 30 } }, audio: false });
+      showToast('Aperçu vidéo actif. Le son de cette carte n’est pas disponible; le micro reste nécessaire pour diffuser.', 'warning');
+    }
+    await startPreview(stream, 'Carte de capture Xbox');
+  } catch (error) {
+    showMediaError(error, 'la carte de capture');
+  }
+}
+
+function toggleSourceTab(tab) {
+  state.sourceTab = tab;
+  $$('.source-tab').forEach((button) => {
+    const active = button.dataset.sourceTab === tab;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', String(active));
+  });
+  $('#pcSourceBody').classList.toggle('hidden', tab !== 'pc');
+  $('#xboxSourceBody').classList.toggle('hidden', tab !== 'xbox');
+}
+
+async function toggleMic() {
+  if (state.micStream) {
+    stopTracks(state.micStream);
+    state.micStream = null;
+    state.micDeviceId = '';
+    stopMeter($('#micLevel'));
+    resetMicUi('Test arrêté');
+    return;
+  }
+  try {
+    const selectedDevice = $('#micSelect').value;
+    const audio = selectedDevice ? { deviceId: { exact: selectedDevice } } : true;
+    const stream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
+    state.micStream = stream;
+    state.micDeviceId = selectedDevice;
+    $('#micTestBtn').innerHTML = '<span>■</span> Arrêter le test';
+    $('#micStatus').textContent = 'Parle pour voir le niveau';
+    $('#micLed').classList.add('on');
+    $('#audioSectionStatus').innerHTML = '<span class="status-dot ready"></span> Micro actif';
+    beginMeter(stream, $('#micLevel'));
+    await loadDevices();
+  } catch (error) {
+    showMediaError(error, 'ton micro');
+  }
+}
+
+function updateCredentialStatus(status) {
+  state.credentialStatus = status || { available: false, twitch: false, youtube: false };
+  for (const platform of PLATFORM_IDS) {
+    const badge = $(`#${platform}Badge`);
+    const configured = Boolean(state.credentialStatus[platform]);
+    const liveStatus = state.streamStatuses[platform];
+    badge.className = 'connection-badge';
+    const text = liveStatus?.status === 'encoding'
+      ? 'Encodage actif'
+      : liveStatus?.status === 'connecting'
+        ? 'Connexion…'
+        : liveStatus?.status === 'error'
+          ? 'Erreur'
+          : configured ? 'Clé configurée' : 'À configurer';
+    if (liveStatus?.status === 'encoding') badge.classList.add('stream-sending');
+    else if (liveStatus?.status === 'error') badge.classList.add('stream-error');
+    else if (configured) badge.classList.add('configured');
+    badge.replaceChildren();
+    const dot = document.createElement('i');
+    const label = document.createElement('span');
+    label.textContent = text;
+    badge.append(dot, label);
+    const input = $(`[data-platform="${platform}"]`);
+    input.disabled = !state.credentialStatus.available || !configured;
+    if (!configured) input.checked = false;
+  }
+  const configuredCount = PLATFORM_IDS.filter((id) => state.credentialStatus[id]).length;
+  $('#platformSectionStatus').innerHTML = state.credentialStatus.available
+    ? configuredCount
+      ? `<span class="status-dot ready"></span> ${configuredCount} destination${configuredCount > 1 ? 's' : ''} configurée${configuredCount > 1 ? 's' : ''}`
+      : '<span class="status-dot muted"></span> Aucune clé configurée'
+    : '<span class="status-dot warning"></span> Application Windows requise';
+  updatePlatformSelection({ persist: false });
+}
+
+function updatePlatformSelection({ persist = true } = {}) {
+  const selected = [];
+  $$('[data-platform]').forEach((input) => {
+    const card = input.closest('.platform-card');
+    card.classList.toggle('selected', input.checked);
+    if (input.checked && PLATFORM_IDS.includes(input.dataset.platform)) selected.push(input.dataset.platform);
+  });
+  state.selectedPlatforms = new Set(selected);
+  if (persist) localStorage.setItem('lumacast-platforms', JSON.stringify(selected));
+  $('#navPlatformCheck').textContent = String(selected.length);
+  const configuredCount = PLATFORM_IDS.filter((id) => state.credentialStatus[id]).length;
+  $('#readinessText').textContent = selected.length
+    ? `${selected.length} destination${selected.length > 1 ? 's' : ''} sélectionnée${selected.length > 1 ? 's' : ''}. Vérifie la source, le microphone et le débit montant avant l’envoi.`
+    : configuredCount
+      ? 'Choisis les destinations configurées à utiliser pour ce direct.'
+      : 'Configure d’abord une clé Twitch ou les paramètres d’ingestion YouTube.';
+  updateBitrateNotice();
+}
+
+function updateBitrateNotice() {
+  const profile = LIVE_PROFILES[state.quality] || LIVE_PROFILES.balanced;
+  const selectedCount = state.selectedPlatforms.size;
+  const totalMbps = ((profile.bitrate + 160) * selectedCount / 1000).toFixed(1);
+  $('#bitrateNotice').textContent = selectedCount > 1
+    ? `Estimation multistream : environ ${totalMbps} Mb/s sortants et plusieurs encodages simultanés. Prévois une marge réseau.`
+    : selectedCount === 1
+      ? `Débit vidéo estimé : ${profile.bitrate} kb/s, plus l’audio. La connexion doit garder une marge.`
+      : 'Sélectionne une ou plusieurs destinations pour estimer le débit sortant.';
+}
+
+function selectQuality(value) {
+  if (!LIVE_PROFILES[value]) value = 'balanced';
+  state.quality = value;
+  localStorage.setItem('lumacast-quality', value);
+  $$('.quality-option').forEach((option) => option.classList.toggle('selected', $('input', option).checked));
+  updateBitrateNotice();
+}
+
+function addFormField(form, labelText, { type = 'text', placeholder = '', autocomplete = 'off', inputMode = 'text' } = {}) {
+  const wrapper = document.createElement('label');
+  wrapper.className = 'credential-field';
+  const label = document.createElement('span');
+  label.textContent = labelText;
+  const input = document.createElement('input');
+  input.type = type;
+  input.placeholder = placeholder;
+  input.autocomplete = autocomplete;
+  input.spellcheck = false;
+  input.inputMode = inputMode;
+  input.required = true;
+  input.maxLength = 512;
+  wrapper.append(label, input);
+  form.append(wrapper);
+  return input;
+}
+
+async function openCredentialModal(platform) {
+  const details = PLATFORM_DETAILS[platform];
+  if (!details) {
+    showModal({ title: 'TikTok LIVE indisponible', eyebrow: 'NON PRIS EN CHARGE EN 0.4', body: 'Camton Live 0.4 ne diffuse pas vers TikTok. L’accès aux logiciels de diffusion externes dépend des autorisations accordées par TikTok à chaque compte.', items: ['Aucune clé TikTok n’est demandée.', 'Le bouton de sélection TikTok est désactivé.', 'Cette limite ne peut pas être contournée par Camton Live.'], mark: '♪' });
+    return;
+  }
+  if (!desktop?.isDesktopApp || !state.credentialStatus.available) {
+    showModal({ title: 'Configuration désactivée ici', eyebrow: 'APPLICATION WINDOWS REQUISE', body: 'Ne saisis aucune clé dans cet aperçu Web. Les clés ne sont enregistrées que par l’application Windows, chiffrées avec le stockage sécurisé du système.', items: [details.instruction], mark: '!' });
+    return;
+  }
+  if (state.credentialStatus.damaged) {
+    const confirmed = window.confirm('Le fichier chiffré des destinations est illisible. Le réinitialiser supprimera toutes les clés enregistrées sur cet appareil. Continuer ?');
+    if (!confirmed) return;
+    try {
+      const status = await desktop.resetCredentials();
+      updateCredentialStatus(status);
+      state.selectedPlatforms.clear();
+      updatePlatformSelection();
+      showToast('Configuration locale réinitialisée. Les clés peuvent être saisies à nouveau.');
+    } catch (error) {
+      showModal({ title: 'Réinitialisation impossible', body: error?.message || 'Le fichier chiffré n’a pas pu être supprimé.', mark: '!' });
+      return;
+    }
+  }
+
+  $('#modalTitle').textContent = details.title;
+  $('#modalEyebrow').textContent = 'CLÉ CHIFFRÉE SUR CET APPAREIL';
+  $('#modalMark').textContent = platform === 'twitch' ? '▰' : '▶';
+  $('#modalOk').classList.add('hidden');
+  const copy = $('#modalCopy');
+  copy.replaceChildren();
+  const intro = document.createElement('p');
+  intro.textContent = details.instruction;
+  copy.append(intro);
+  const warning = document.createElement('p');
+  warning.className = 'credential-warning';
+  warning.textContent = 'Camton Live chiffre la clé au repos et ne demande pas ton mot de passe. Pendant un direct, l’adresse avec la clé passe à FFmpeg et peut être visible aux outils locaux d’inspection des processus. Une clé déjà enregistrée n’est jamais affichée dans l’application.';
+  copy.append(warning);
+
+  const form = document.createElement('form');
+  form.className = 'credential-form';
+  form.autocomplete = 'off';
+  let endpointInput = null;
+  if (platform === 'youtube') {
+    endpointInput = addFormField(form, 'Adresse du serveur d’ingestion YouTube', {
+      type: 'url', placeholder: 'rtmps://a.rtmps.youtube.com:443/live2', autocomplete: 'url', inputMode: 'url',
+    });
+  }
+  const keyInput = addFormField(form, `Clé de diffusion ${details.name}`, {
+    type: 'password', placeholder: 'Coller la clé fournie par la plateforme', autocomplete: 'new-password',
+  });
+  const formMessage = document.createElement('p');
+  formMessage.className = 'credential-message';
+  formMessage.setAttribute('aria-live', 'polite');
+  const actions = document.createElement('div');
+  actions.className = 'credential-actions';
+  const saveButton = document.createElement('button');
+  saveButton.type = 'submit';
+  saveButton.className = 'button button-primary';
+  saveButton.textContent = state.credentialStatus[platform] ? 'Mettre à jour' : 'Enregistrer';
+  const clearButton = document.createElement('button');
+  clearButton.type = 'button';
+  clearButton.className = 'button button-secondary';
+  clearButton.textContent = 'Effacer la clé';
+  clearButton.disabled = !state.credentialStatus[platform];
+  actions.append(saveButton, clearButton);
+  form.append(formMessage, actions);
+  copy.append(form);
+
+  const wipe = () => {
+    keyInput.value = '';
+    if (endpointInput) endpointInput.value = '';
+  };
+  state.modalCleanup = wipe;
+  clearButton.addEventListener('click', async () => {
+    if (!state.credentialStatus[platform]) return;
+    if (!window.confirm(`Effacer les paramètres ${details.name} chiffrés sur cet appareil ?`)) return;
+    clearButton.disabled = true;
+    try {
+      const status = await desktop.clearCredentials(platform);
+      updateCredentialStatus(status);
+      state.selectedPlatforms.delete(platform);
+      updatePlatformSelection();
+      showToast(`Configuration ${details.name} effacée.`);
+      closeModal();
+    } catch (error) {
+      clearButton.disabled = false;
+      formMessage.textContent = error?.message || 'Impossible d’effacer la configuration locale.';
+      formMessage.classList.add('error');
+    }
+  });
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    saveButton.disabled = true;
+    clearButton.disabled = true;
+    formMessage.textContent = 'Chiffrement et sauvegarde en cours…';
+    formMessage.classList.remove('error');
+    try {
+      const values = platform === 'twitch'
+        ? { key: keyInput.value.trim() }
+        : { endpoint: endpointInput.value.trim(), key: keyInput.value.trim() };
+      const status = await desktop.saveCredentials(platform, values);
+      wipe();
+      updateCredentialStatus(status);
+      showToast(`Configuration ${details.name} enregistrée sur cet appareil.`);
+      closeModal();
+    } catch (error) {
+      formMessage.textContent = error?.message || 'Impossible d’enregistrer la clé chiffrée.';
+      formMessage.classList.add('error');
+      saveButton.disabled = false;
+      clearButton.disabled = !state.credentialStatus[platform];
+    }
+  });
+  $('#modalBackdrop').classList.add('open');
+  $('#modalBackdrop').setAttribute('aria-hidden', 'false');
+  keyInput.focus();
+}
+
+function handlePlatformToggle(event) {
+  const input = event.currentTarget;
+  if (state.isStreaming) {
+    input.checked = state.selectedPlatforms.has(input.dataset.platform);
+    showToast('Arrête le direct avant de modifier les destinations.', 'warning');
+    return;
+  }
+  if (input.checked && !state.credentialStatus[input.dataset.platform]) {
+    input.checked = false;
+    updatePlatformSelection();
+    openCredentialModal(input.dataset.platform);
+    return;
+  }
+  updatePlatformSelection();
+}
+
+function renderDestinationStatus(update) {
+  if (!PLATFORM_IDS.includes(update.platform)) return;
+  state.streamStatuses[update.platform] = update;
+  updateCredentialStatus(state.credentialStatus);
+  if (update.status === 'error') showToast(`${PLATFORM_DETAILS[update.platform].name} : ${update.message}`, 'warning');
+  const statuses = [...state.selectedPlatforms].map((platform) => state.streamStatuses[platform]?.status);
+  if (state.isStreaming && statuses.length && statuses.every((status) => status === 'error')) {
+    stopLive({ fromFailure: true });
+  }
+  updateOverallStreamStatus(update);
+}
+
+function updateOverallStreamStatus(update = null) {
+  if (!state.isStreaming) return;
+  const statuses = [...state.selectedPlatforms].map((platform) => state.streamStatuses[platform]?.status);
+  const encoding = statuses.filter((status) => status === 'encoding').length;
+  const connecting = statuses.filter((status) => status === 'connecting').length;
+  const stopped = statuses.length > 0 && statuses.every((status) => status === 'stopped');
+  $('#streamDot').classList.toggle('active', encoding > 0);
+  $('#streamDot').classList.toggle('muted', encoding === 0);
+  if (encoding) {
+    $('#streamStatus').textContent = `${encoding} sortie${encoding > 1 ? 's' : ''} en cours d’encodage local · réception à vérifier dans la plateforme`;
+    $('#sessionTime').textContent = 'Encodage actif';
+  } else if (connecting) {
+    $('#streamStatus').textContent = 'Connexion aux points d’ingestion…';
+  } else if (stopped) {
+    $('#streamStatus').textContent = 'Arrêt des sorties…';
+  } else if (update?.status === 'error') {
+    $('#streamStatus').textContent = 'Une sortie a échoué; les autres restent indépendantes.';
+  } else {
+    $('#streamStatus').textContent = 'Connexion aux points d’ingestion…';
+  }
+}
+
+function startSessionTimer() {
+  clearInterval(state.timerInterval);
+  state.demoStartedAt = Date.now();
+  const update = () => {
+    const seconds = Math.floor((Date.now() - state.demoStartedAt) / 1000);
+    $('#demoTimer').textContent = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+  };
+  update();
+  state.timerInterval = setInterval(update, 1000);
+}
+
+function startDemo() {
+  if (state.isStreaming) {
+    showModal({ title: 'Arrête le direct avant la démo', body: 'La démo locale est séparée des sorties réseau. Arrête d’abord le flux réel pour ne pas mélanger les deux états.', mark: '!' });
+    return;
+  }
+  if (state.demoRunning) {
+    state.demoRunning = false;
+    clearInterval(state.timerInterval);
+    $('#demoBtn').innerHTML = '<span>▷</span> Essayer la démo locale';
+    $('#streamStatus').textContent = 'Démo arrêtée · aucun direct envoyé';
+    $('#sessionTime').textContent = 'Pas démarrée';
+    $('#streamDot').classList.remove('active');
+    $('#streamDot').classList.add('muted');
+    $('#demoTimer').classList.add('hidden');
+    showToast('Démo locale arrêtée. Aucune sortie réseau n’a été utilisée.');
+    return;
+  }
+  state.demoRunning = true;
+  $('#demoBtn').innerHTML = '<span>■</span> Arrêter la démo';
+  $('#streamStatus').textContent = 'DÉMO LOCALE · aucun flux envoyé';
+  $('#sessionTime').textContent = 'Démo locale';
+  $('#streamDot').classList.add('active');
+  $('#streamDot').classList.remove('muted');
+  $('#demoTimer').classList.remove('hidden');
+  startSessionTimer();
+  showModal({ title: 'Démo locale démarrée', eyebrow: 'RIEN N’EST DIFFUSÉ', body: 'Le chronomètre est animé localement. Aucune vidéo, aucune piste audio et aucune clé ne sont envoyées aux plateformes.', items: ['Les badges des plateformes restent à leur état réel.', 'Le compteur n’est pas un statut de direct.', 'Arrête la démo avec le même bouton.'], mark: '▶' });
+}
+
+function showLiveUnavailable() {
+  showModal({ title: 'Ouvre l’application Camton Live Windows', eyebrow: 'MOTEUR DE BUREAU REQUIS', body: 'La page Web sert uniquement d’aperçu. La capture, le chiffrement local des clés et l’encodeur RTMP fonctionnent dans l’application portable Windows x64.', items: ['Ne saisis jamais une clé dans cet aperçu Web.', 'Télécharge et lance le ZIP portable Camton Live sur Windows.', 'TikTok LIVE n’est pas pris en charge dans cette bêta.'], mark: '!' });
+}
+
+async function createBroadcastStream() {
+  if (!state.sourceStream?.getVideoTracks().some((track) => track.readyState === 'live')) throw new Error('Aucune source vidéo active.');
+  if (!state.micStream?.getAudioTracks().some((track) => track.readyState === 'live')) {
+    stopTracks(state.micStream);
+    state.micStream = null;
+    state.micDeviceId = '';
+    stopMeter($('#micLevel'));
+    const selectedDevice = $('#micSelect').value;
+    const audio = selectedDevice ? { deviceId: { exact: selectedDevice } } : true;
+    state.micStream = await navigator.mediaDevices.getUserMedia({ audio, video: false });
+    state.micDeviceId = selectedDevice;
+    $('#micTestBtn').innerHTML = '<span>■</span> Micro actif';
+    $('#micStatus').textContent = 'Micro utilisé pour le direct';
+    $('#micLed').classList.add('on');
+    $('#audioSectionStatus').innerHTML = '<span class="status-dot ready"></span> Micro actif';
+    beginMeter(state.micStream, $('#micLevel'));
+    await loadDevices();
+  }
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) throw new Error('Le mixage audio n’est pas disponible sur cette version de Windows.');
+  const context = new AudioContextClass();
+  state.mixContext = context;
+  await context.resume();
+  const destination = context.createMediaStreamDestination();
+  const inputs = [state.sourceStream, state.micStream].filter((stream) => stream?.getAudioTracks().some((track) => track.readyState === 'live'));
+  if (!inputs.some((stream) => stream === state.micStream)) throw new Error('Choisis un microphone pour continuer.');
+  for (const stream of inputs) {
+    const track = stream.getAudioTracks()[0];
+    const source = context.createMediaStreamSource(new MediaStream([track]));
+    const gain = context.createGain();
+    // La voix reste au premier plan, le son de la source est légèrement en retrait.
+    gain.gain.value = stream === state.micStream ? 1 : 0.7;
+    source.connect(gain).connect(destination);
+  }
+  const tracks = [
+    ...state.sourceStream.getVideoTracks(),
+    ...destination.stream.getAudioTracks(),
+  ];
+  state.mixedStream = new MediaStream(tracks);
+  return state.mixedStream;
+}
+
+function recorderMimeType() {
+  const candidates = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm'];
+  return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || '';
+}
+
+async function startLive() {
+  if (!desktop?.isDesktopApp) {
+    showLiveUnavailable();
+    return;
+  }
+  if (state.isStarting || state.isStreaming) return;
+  if (!state.credentialStatus.available) {
+    showModal({ title: 'Stockage chiffré indisponible', body: 'Camton Live ne peut pas enregistrer les clés sans chiffrement système. Vérifie que tu utilises le paquet Windows x64.', mark: '!' });
+    return;
+  }
+  if (!state.sourceStream?.getVideoTracks().some((track) => track.readyState === 'live')) {
+    showToast('Active l’aperçu de ton écran, d’une fenêtre ou de ta carte de capture avant de démarrer.', 'warning');
+    scrollToSection('source');
+    return;
+  }
+  if (!state.selectedPlatforms.size) {
+    showModal({ title: 'Choisis une destination', eyebrow: 'ÉTAPE 3', body: 'Configure d’abord une clé Twitch ou les paramètres d’ingestion YouTube, puis sélectionne cette destination.', mark: '!' });
+    scrollToSection('platforms');
+    return;
+  }
+  const platforms = [...state.selectedPlatforms];
+  const missing = platforms.find((platform) => !state.credentialStatus[platform]);
+  if (missing) {
+    await openCredentialModal(missing);
+    return;
+  }
+  const profile = LIVE_PROFILES[state.quality] || LIVE_PROFILES.balanced;
+  const total = ((profile.bitrate + 160) * platforms.length / 1000).toFixed(1);
+  if (platforms.length > 1 && !window.confirm(`Tu as sélectionné ${platforms.length} plateformes. Camton Live encodera un flux pour chacune. Débit montant approximatif : ${total} Mb/s, plus la marge réseau. Continuer ?`)) return;
+
+  state.isStarting = true;
+  $('#startLiveBtn').disabled = true;
+  $('#startLiveBtn').textContent = 'Préparation du flux…';
+  try {
+    const mixed = await createBroadcastStream();
+    const mimeType = recorderMimeType();
+    const options = {
+      videoBitsPerSecond: Math.round(profile.bitrate * 1250),
+      audioBitsPerSecond: 160000,
+    };
+    const recorder = mimeType
+      ? new MediaRecorder(mixed, { ...options, mimeType })
+      : new MediaRecorder(mixed, options);
+    state.mediaRecorder = recorder;
+    state.streamStatuses = {};
+    state.chunkQueue = Promise.resolve();
+    state.queuedBytes = 0;
+    state.stopRequested = false;
+    recorder.addEventListener('dataavailable', (event) => {
+      if (!event.data?.size) return;
+      state.queuedBytes += event.data.size;
+      if (state.queuedBytes > 12 * 1024 * 1024) {
+        showToast('Le réseau ou l’encodeur ne suit pas. Le flux va être arrêté pour éviter une accumulation mémoire.', 'warning');
+        stopLive({ fromFailure: true });
+        return;
+      }
+      state.chunkQueue = state.chunkQueue.then(async () => {
+        const bytes = await event.data.arrayBuffer();
+        await desktop.pushChunk(bytes);
+        state.queuedBytes = Math.max(0, state.queuedBytes - event.data.size);
+      }).catch((error) => {
+        state.queuedBytes = Math.max(0, state.queuedBytes - event.data.size);
+        if (state.isStreaming && !state.stopRequested) {
+          showToast(error?.message || 'Le segment média n’a pas pu être transmis à l’encodeur.', 'warning');
+          stopLive({ fromFailure: true });
+        }
+      });
+    });
+    recorder.addEventListener('error', () => {
+      if (state.isStreaming && !state.stopRequested) stopLive({ fromFailure: true });
+    });
+
+    await desktop.startStream({ platforms, profileName: state.quality });
+    recorder.start(1000);
+    state.isStreaming = true;
+    renderUpdateNotice();
+    state.demoRunning = false;
+    $('#demoBtn').innerHTML = '<span>▷</span> Essayer la démo locale';
+    $('#startLiveBtn').innerHTML = 'Arrêter le direct <span>■</span>';
+    $('#startLiveBtn').classList.add('stream-active-button');
+    $('#sessionTime').textContent = 'Préparation du flux…';
+    $('#demoTimer').classList.remove('hidden');
+    startSessionTimer();
+    updateOverallStreamStatus();
+    $('#readinessText').textContent = `Profil ${profile.label} prévu · ${profile.width} × ${profile.height} · ${profile.fps} i/s · débit cible d’environ ${total} Mb/s sortants.`;
+    showToast('Encodeur lancé. Vérifie la réception dans la plateforme avant de considérer le direct confirmé.');
+  } catch (error) {
+    await desktop.stopStream().catch(() => {});
+    state.mediaRecorder = null;
+    state.isStreaming = false;
+    renderUpdateNotice();
+    state.streamStatuses = {};
+    stopTracks(state.micStream);
+    state.micStream = null;
+    state.micDeviceId = '';
+    stopMeter($('#micLevel'));
+    resetMicUi('Micro arrêté après l’échec du démarrage');
+    if (state.mixContext) state.mixContext.close().catch(() => {});
+    state.mixContext = null;
+    state.mixedStream = null;
+    const message = error?.message || 'Impossible de démarrer le moteur de diffusion.';
+    if (/micro|permission|media|device/i.test(message)) showMediaError(error, 'ton microphone');
+    else showModal({ title: 'Démarrage impossible', eyebrow: 'VÉRIFICATION', body: message, items: ['Vérifie qu’une source et un microphone sont actifs.', 'Vérifie que la clé a été enregistrée dans l’application Windows.', 'En multistream, essaie un profil de qualité inférieur.'], mark: '!' });
+  } finally {
+    state.isStarting = false;
+    $('#startLiveBtn').disabled = false;
+    if (!state.isStreaming) {
+      $('#startLiveBtn').innerHTML = 'Démarrer un direct <span>→</span>';
+      $('#startLiveBtn').classList.remove('stream-active-button');
+    }
+  }
+}
+
+async function stopLive({ fromFailure = false } = {}) {
+  if (state.stopRequested) return;
+  state.stopRequested = true;
+  const recorder = state.mediaRecorder;
+  if (recorder && recorder.state !== 'inactive') {
+    await new Promise((resolve) => {
+      recorder.addEventListener('stop', resolve, { once: true });
+      try { recorder.stop(); } catch { resolve(); }
+    });
+  }
+  await state.chunkQueue.catch(() => {});
+  if (desktop?.isDesktopApp) await desktop.stopStream().catch(() => {});
+  state.isStreaming = false;
+  renderUpdateNotice();
+  state.mediaRecorder = null;
+  state.mixedStream?.getTracks().forEach((track) => track.stop());
+  state.mixedStream = null;
+  if (state.mixContext) await state.mixContext.close().catch(() => {});
+  state.mixContext = null;
+  clearInterval(state.timerInterval);
+  $('#startLiveBtn').innerHTML = 'Démarrer un direct <span>→</span>';
+  $('#startLiveBtn').classList.remove('stream-active-button');
+  $('#sessionTime').textContent = 'Pas démarrée';
+  $('#demoTimer').textContent = '00:00';
+  $('#demoTimer').classList.add('hidden');
+  $('#streamStatus').textContent = fromFailure ? 'Sorties arrêtées après une erreur' : 'Aucun direct en cours';
+  $('#streamDot').classList.remove('active');
+  $('#streamDot').classList.add('muted');
+  state.streamStatuses = {};
+  updateCredentialStatus(state.credentialStatus);
+  stopSource();
+  if (!fromFailure) showToast('Sorties arrêtées. Les pistes média et l’encodeur ont été libérés.');
+  state.stopRequested = false;
+}
+
+function scrollToSection(id) {
+  const section = document.getElementById(id);
+  if (!section) return;
+  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $$('.nav-item').forEach((item) => item.classList.toggle('active', item.dataset.nav === id));
+}
+
+function openGuide() {
+  showModal({
+    title: 'On y va étape par étape', eyebrow: 'GUIDE CAMTON LIVE',
+    body: 'Prépare la source, vérifie le son, configure tes clés officielles, puis vérifie la qualité et le débit avant l’envoi.',
+    items: [
+      'Sur PC, choisis un écran, une fenêtre ou un jeu dans le sélecteur intégré.',
+      'Sur Xbox, branche une carte de capture HDMI compatible en USB au PC.',
+      'Teste ton micro; son niveau bouge quand l’application reçoit du son.',
+      'Configure Twitch avec ta clé personnelle ou YouTube avec le serveur et la clé de YouTube Studio.',
+      'Camton Live chiffre les clés sur Windows. Ne partage jamais une clé et ne saisis pas ton mot de passe.',
+      'YouTube peut exiger un événement préalablement configuré et démarré dans Studio. TikTok LIVE n’est pas pris en charge.',
+      'La démo est uniquement locale. Le bouton de diffusion envoie un vrai flux aux destinations sélectionnées.',
+    ], mark: '?',
+  });
+}
+
+async function startDesktopCapture(source) {
+  try {
+    let stream;
+    const capture = async (audio) => {
+      await desktop.selectCaptureSource(source.id);
+      return navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: { ideal: 30, max: 60 } },
+        audio,
+      });
+    };
+    try {
+      stream = await capture(true);
+    } catch (error) {
+      if (['NotAllowedError', 'PermissionDeniedError', 'AbortError'].includes(error?.name)) throw error;
+      stream = await capture(false);
+      showToast('Aperçu vidéo actif. Le son système n’est pas disponible sur cette configuration; le micro reste requis.', 'warning');
+    }
+    await startPreview(stream, source.name || 'Écran / fenêtre PC');
+  } catch (error) {
+    showMediaError(error, 'l’écran ou la fenêtre');
+  }
+}
+
+async function refreshCredentialStatus() {
+  if (!desktop?.isDesktopApp) {
+    updateCredentialStatus({ available: false, twitch: false, youtube: false });
+    return;
+  }
+  try {
+    updateCredentialStatus(await desktop.getCredentialStatus());
+  } catch {
+    updateCredentialStatus({ available: false, twitch: false, youtube: false });
+  }
+}
+
+function init() {
+  if (state.selectedPlatforms.size) {
+    $$('[data-platform]').forEach((input) => { input.checked = state.selectedPlatforms.has(input.dataset.platform); });
+  }
+  const qualityInput = $(`input[name="quality"][value="${state.quality}"]`);
+  if (qualityInput) qualityInput.checked = true;
+  selectQuality(state.quality);
+  state.removeStreamListener = desktop?.onStreamStatus?.(renderDestinationStatus) || null;
+  state.removeUpdateListener = desktop?.onUpdateState?.(renderUpdateNotice) || null;
+  desktop?.getUpdateState?.().then(renderUpdateNotice).catch(() => {});
+
+  $('#updateAction').addEventListener('click', handleUpdateAction);
+  $('#updateDismiss').addEventListener('click', () => {
+    state.updateDismissed = true;
+    renderUpdateNotice();
+  });
+
+  $$('.source-tab').forEach((button) => button.addEventListener('click', () => toggleSourceTab(button.dataset.sourceTab)));
+  $('#capturePcBtn').addEventListener('click', async () => {
+    if (desktop?.isDesktopApp) {
+      try {
+        const sources = await desktop.listCaptureSources();
+        if (!sources.length) {
+          showModal({ title: 'Aucune source disponible', body: 'Vérifie les autorisations de partage d’écran de Windows, puis réessaie.', mark: '!' });
+          return;
+        }
+        showDesktopSourcePicker(sources);
+      } catch {
+        showModal({ title: 'Impossible de lire les écrans', body: 'Ferme puis rouvre Camton Live. Si le problème persiste, vérifie les autorisations de partage d’écran de Windows.', mark: '!' });
+      }
+      return;
+    }
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      showModal({ title: 'Partage d’écran non disponible', body: 'Ouvre Camton Live sur Windows pour capturer un écran ou une fenêtre.', mark: '!' });
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30, max: 60 } }, audio: true });
+      await startPreview(stream, 'Écran / fenêtre PC');
+    } catch (error) {
+      if (error?.name !== 'AbortError') showMediaError(error, 'l’écran ou la fenêtre');
+      else showToast('Partage annulé.', 'warning');
+    }
+  });
+  $('#scanBtn').addEventListener('click', () => loadDevices({ requestPermission: true }));
+  $('#connectCardBtn').addEventListener('click', startCaptureCard);
+  $('#stopPreviewBtn').addEventListener('click', async () => {
+    if (state.isStreaming) await stopLive();
+    else stopSource();
+    showToast('Aperçu arrêté. Les pistes sélectionnées ont été libérées.');
+  });
+  $('#micSelect').addEventListener('change', () => {
+    if (state.isStreaming) {
+      $('#micSelect').value = state.micDeviceId || '';
+      showToast('Arrête le direct avant de changer de microphone.', 'warning');
+      return;
+    }
+    if (state.micStream) stopTracks(state.micStream);
+    state.micStream = null;
+    state.micDeviceId = '';
+    stopMeter($('#micLevel'));
+    resetMicUi('Micro sélectionné; teste-le avant le direct');
+  });
+  $('#micTestBtn').addEventListener('click', toggleMic);
+  $$('[data-platform]').forEach((input) => input.addEventListener('change', handlePlatformToggle));
+  $$('[data-platform-info]').forEach((button) => button.addEventListener('click', () => openCredentialModal(button.dataset.platformInfo)));
+  $$('input[name="quality"]').forEach((input) => input.addEventListener('change', () => {
+    if (state.isStreaming) {
+      $$('input[name="quality"]').forEach((option) => { option.checked = option.value === state.quality; });
+      showToast('Arrête le direct avant de changer la qualité d’encodage.', 'warning');
+      return;
+    }
+    selectQuality(input.value);
+  }));
+  $('#demoBtn').addEventListener('click', startDemo);
+  $('#startLiveBtn').addEventListener('click', () => state.isStreaming ? stopLive() : startLive());
+  $('#helpBtn').addEventListener('click', openGuide);
+  $('#helpTopBtn').addEventListener('click', openGuide);
+  $('#dismissBanner').addEventListener('click', () => $('#demoBanner').remove());
+  $('#privacyBtn').addEventListener('click', () => showModal({
+    title: 'Ta vidéo reste chez toi avant l’envoi', eyebrow: 'CONFIDENTIALITÉ',
+    body: 'L’aperçu et le mixage sont locaux. Pendant un direct, l’application transmet le flux uniquement aux destinations que tu as choisies. Les clés sont chiffrées par le stockage sécurisé de Windows.',
+    items: ['Aucun mot de passe ou cookie de plateforme n’est demandé.', 'Les clés ne vont pas dans localStorage, sur un serveur Camton Live ou dans les journaux.', 'Tu peux supprimer les clés dans la configuration de chaque destination.', 'Arrêter le direct termine les sorties et libère les pistes média.'], mark: '✓',
+  }));
+  $('#modalClose').addEventListener('click', closeModal);
+  $('#modalOk').addEventListener('click', closeModal);
+  $('#modalBackdrop').addEventListener('click', (event) => { if (event.target === $('#modalBackdrop')) closeModal(); });
+  document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeModal(); });
+  $$('[data-nav], [data-step]').forEach((link) => link.addEventListener('click', (event) => {
+    event.preventDefault();
+    scrollToSection(link.getAttribute('href').slice(1));
+  }));
+  if (navigator.mediaDevices?.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => loadDevices());
+  loadDevices();
+  refreshCredentialStatus();
+}
+
+init();
