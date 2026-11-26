@@ -15,6 +15,11 @@ export const PLATFORM_DETAILS = Object.freeze({
     title: 'Configurer Twitch',
     instruction: 'Dans ton tableau de bord créateur Twitch, ouvre les paramètres de diffusion et copie ta clé de stream. Ne saisis jamais ton mot de passe Twitch dans Camton Live.',
   }),
+  relay: Object.freeze({
+    name: 'Relais',
+    title: 'Configurer un relais',
+    instruction: 'Colle l’adresse du serveur et la clé fournies par ton relais (Restream, Streamlabs, ou un serveur RTMP personnel). Le relais redistribue ensuite vers TikTok, YouTube ou Twitch. Il évite de dépendre de la clé de flux d’une plateforme, mais il ne débloque pas un compte que cette plateforme refuse.',
+  }),
   tiktok: Object.freeze({
     name: 'TikTok',
     title: 'Configurer TikTok',
@@ -22,4 +27,4 @@ export const PLATFORM_DETAILS = Object.freeze({
   }),
 });
 
-export const PLATFORM_IDS = Object.freeze(['twitch', 'youtube', 'tiktok']);
+export const PLATFORM_IDS = Object.freeze(['twitch', 'youtube', 'tiktok', 'relay']);

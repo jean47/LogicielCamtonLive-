@@ -440,7 +440,7 @@ select:hover { border-color: #514680; }
 /* ---------- Plateformes ---------- */
 .platform-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: clamp(12px, 1.4vw, 18px);
 }
 
@@ -480,6 +480,7 @@ select:hover { border-color: #514680; }
 .platform-logo--youtube { background: rgba(255, 74, 82, .16); color: #ff8d93; }
 .platform-logo--twitch { background: rgba(145, 71, 255, .18); color: #c2a0ff; }
 .platform-logo--tiktok { background: rgba(57, 200, 255, .12); color: #8adcff; }
+.platform-logo--relay { background: rgba(126, 231, 190, .12); color: #7ee7be; }
 
 .platform-card h3 { font-size: var(--fs-base); }
 .platform-card p { flex: 1; font-size: var(--fs-xs); line-height: 1.55; color: var(--text-muted); }

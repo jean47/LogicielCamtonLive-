@@ -27,7 +27,7 @@ const state = {
   demoRunning: false,
   selectedPlatforms: new Set(storedPlatforms),
   quality: localStorage.getItem('lumacast-quality') || localStorage.getItem('sf-quality') || 'balanced',
-  credentialStatus: { available: false, twitch: false, youtube: false, tiktok: false },
+  credentialStatus: { available: false, twitch: false, youtube: false, tiktok: false, relay: false },
   streamStatuses: {},
   isStreaming: false,
   isStarting: false,
@@ -520,7 +520,7 @@ function toggleSourceTab(tab) {
 }
 
 function updateCredentialStatus(status) {
-  state.credentialStatus = status || { available: false, twitch: false, youtube: false, tiktok: false };
+  state.credentialStatus = status || { available: false, twitch: false, youtube: false, tiktok: false, relay: false };
   for (const platform of PLATFORM_IDS) {
     const badge = $(`#${platform}Badge`);
     const configured = Boolean(state.credentialStatus[platform]);
@@ -569,7 +569,7 @@ function updatePlatformSelection({ persist = true } = {}) {
     ? `${selected.length} destination${selected.length > 1 ? 's' : ''} sélectionnée${selected.length > 1 ? 's' : ''}. Vérifie la source, le microphone et le débit montant avant l’envoi.`
     : configuredCount
       ? 'Choisis les destinations configurées à utiliser pour ce direct.'
-      : 'Configure d’abord une destination : Twitch, YouTube ou TikTok.';
+      : 'Configure d’abord une destination : Twitch, YouTube, TikTok ou un relais.';
   updateBitrateNotice();
 }
 
@@ -637,7 +637,7 @@ async function openCredentialModal(platform) {
 
   $('#modalTitle').textContent = details.title;
   $('#modalEyebrow').textContent = 'CLÉ CHIFFRÉE SUR CET APPAREIL';
-  const platformMarks = { twitch: '▰', youtube: '▶', tiktok: '♪' };
+  const platformMarks = { twitch: '▰', youtube: '▶', tiktok: '♪', relay: '⇄' };
   $('#modalMark').textContent = platformMarks[platform] || '▶';
   $('#modalOk').classList.add('hidden');
   const copy = $('#modalCopy');
@@ -657,7 +657,9 @@ async function openCredentialModal(platform) {
   if (platform !== 'twitch') {
     const endpointField = platform === 'youtube'
       ? { label: 'Adresse du serveur d’ingestion YouTube', placeholder: 'rtmps://a.rtmps.youtube.com:443/live2' }
-      : { label: 'Adresse du serveur TikTok', placeholder: 'rtmps://…:443/app' };
+      : platform === 'relay'
+        ? { label: 'Adresse du serveur du relais', placeholder: 'rtmps://live.restream.io:443/live' }
+        : { label: 'Adresse du serveur TikTok', placeholder: 'rtmps://…:443/app' };
     endpointInput = addFormField(form, endpointField.label, {
       type: 'url', placeholder: endpointField.placeholder, autocomplete: 'url', inputMode: 'url',
     });
@@ -1337,7 +1339,16 @@ function openGuide() {
         ],
       },
       {
-        title: '6 · Avant d’appuyer sur Démarrer',
+        title: '6 · Relais : diffuser par un intermédiaire',
+        items: [
+          'Un relais (Restream, Streamlabs, serveur RTMP personnel) reçoit un seul flux et le répartit vers TikTok, YouTube ou Twitch.',
+          'Crée le direct dans le relais, ajoute tes plateformes, puis copie l’adresse du serveur et la clé dans la carte Relais.',
+          'Un seul envoi au lieu de deux : c’est le moyen le plus simple de tenir TikTok et Twitch avec une connexion modeste.',
+          'Le relais ne débloque pas un compte que la plateforme refuse : l’éligibilité au direct reste celle de TikTok.',
+        ],
+      },
+      {
+        title: '7 · Avant d’appuyer sur Démarrer',
         items: [
           'La liste de contrôle vérifie source, son et destination ; le compte à rebours de trois secondes laisse le temps de relire.',
           'Chaque destination sélectionnée consomme son propre débit : deux plateformes, deux fois le débit montant.',
@@ -1358,6 +1369,7 @@ function openFaq() {
       { title: 'Où trouver ma clé Twitch ?', text: 'Tableau de bord créateur → Paramètres → Diffusion → Clé de flux primaire, puis « Afficher » et copie.' },
       { title: 'Où trouver l’adresse et la clé YouTube ?', text: 'YouTube Studio → Créer → Passer au direct → Gérer → Programmer un direct, puis « Diffusion personnalisée » dans les paramètres du flux. L’adresse commence par rtmps:// et la clé fait une trentaine de caractères.' },
       { title: 'Et TikTok ?', text: 'La destination est disponible depuis le 2 décembre 2026. Il faut l’adresse du serveur et la clé de flux fournies par l’application TikTok, et cette clé change à chaque direct. L’accès au direct dépend de ton compte et de ton pays : sans l’option de clé de flux, un service de relais reste la solution.' },
+      { title: 'TikTok ne me donne pas de clé, un relais aide-t-il ?', text: 'Oui pour le cas de la clé : le relais fournit sa propre adresse et sa propre clé, et c’est lui qui pousse vers TikTok. Non pour l’éligibilité : si TikTok refuse le direct à ton compte, le relais échouera aussi. Dans les deux cas, la carte Relais accepte aussi un serveur RTMP personnel.' },
       { title: 'Mes clés partent-elles sur un serveur ?', text: 'Non. Elles sont chiffrées sur ton PC avec le stockage sécurisé de Windows et ne sont jamais réaffichées. Pendant un direct, l’adresse complète est passée à FFmpeg : elle peut donc apparaître dans un outil local d’inspection des processus.' },
       { title: 'Puis-je diffuser sur plusieurs plateformes en même temps ?', text: 'Oui. Camton Live lance un encodage par destination. Deux plateformes, c’est deux fois le débit montant : vérifie ta connexion avant de cocher la deuxième.' },
       { title: 'Quel réglage de qualité choisir ?', text: 'Fluide pour une connexion modeste (720p, 3 Mb/s), Équilibré par défaut (720p, 4,5 Mb/s), Très net pour un PC solide et une bonne fibre (1080p, 6 Mb/s). Le débit annoncé est par destination.' },
@@ -1425,13 +1437,13 @@ async function startDesktopCapture(source) {
 
 async function refreshCredentialStatus() {
   if (!desktop?.isDesktopApp) {
-    updateCredentialStatus({ available: false, twitch: false, youtube: false, tiktok: false });
+    updateCredentialStatus({ available: false, twitch: false, youtube: false, tiktok: false, relay: false });
     return;
   }
   try {
     updateCredentialStatus(await desktop.getCredentialStatus());
   } catch {
-    updateCredentialStatus({ available: false, twitch: false, youtube: false, tiktok: false });
+    updateCredentialStatus({ available: false, twitch: false, youtube: false, tiktok: false, relay: false });
   }
 }
 

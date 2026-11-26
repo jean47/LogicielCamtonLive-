@@ -2,8 +2,9 @@
   "version": "0.5.1",
   "notes": [
     "TikTok : nouvelle destination. Colle l’adresse du serveur et la clé de flux fournies par l’application TikTok, puis ajoute la destination à ton live.",
-    "La clé TikTok change à chaque direct : Camton Live la chiffre comme les autres, mais il faut la recopier avant chaque session.",
-    "Le guide et la FAQ expliquent où trouver la clé Twitch, l’adresse YouTube et la clé TikTok, et pourquoi TikTok dépend du compte et du pays.",
+    "Relais : nouvelle destination aussi. Restream, Streamlabs ou un serveur RTMP personnel reçoit un seul flux et le répartit vers TikTok, YouTube ou Twitch.",
+    "Un relais dépanne quand une plateforme ne te donne pas de clé de flux ; il ne débloque pas un compte que la plateforme refuse.",
+    "Le guide et la FAQ expliquent où trouver chaque clé et comment passer par un relais.",
     "Camton Live reste en bêta jusqu’à la version 1.0.0."
   ]
 }

@@ -138,6 +138,14 @@ test('destinations are built from the encrypted credentials only', () => {
   assert.throws(() => destinationFor('youtube', { youtube: { endpoint: 'rtmps://a.rtmps.youtube.com:443/live2' } }), /incomplets/);
 });
 
+test('a relay destination joins the address and the key of the intermediary', () => {
+  assert.equal(
+    destinationFor('relay', { relay: { endpoint: 'rtmps://live.restream.io:443/live/', key: 'abc123' } }),
+    'rtmps://live.restream.io:443/live/abc123',
+  );
+  assert.throws(() => destinationFor('relay', { relay: { key: 'abc123' } }), /incomplets/);
+});
+
 test('a tiktok destination joins the ingest address and the session key', () => {
   assert.equal(
     destinationFor('tiktok', { tiktok: { endpoint: 'rtmps://push-rtmp-l6.example.tiktokcdn.com:443/stream/', key: ' cle ' } }),
@@ -201,7 +209,7 @@ test('duplicate, unknown, empty and concurrent sessions are refused', async (t) 
   const { engine } = harness(t);
   await assert.rejects(engine.start({ platforms: ['twitch', 'twitch'], profileName: 'balanced', credentials: CREDENTIALS }), /deux fois/);
   await assert.rejects(engine.start({ platforms: ['kick'], profileName: 'balanced', credentials: CREDENTIALS }), /non prise en charge/);
-  await assert.rejects(engine.start({ platforms: [], profileName: 'balanced', credentials: CREDENTIALS }), /Sélectionne Twitch/);
+  await assert.rejects(engine.start({ platforms: [], profileName: 'balanced', credentials: CREDENTIALS }), /une ou deux destinations/);
   await assert.rejects(engine.start({ platforms: ['twitch'], profileName: 'ultra', credentials: CREDENTIALS }), /Préréglage vidéo inconnu/);
 
   await engine.start({ platforms: ['twitch'], profileName: 'balanced', credentials: CREDENTIALS });

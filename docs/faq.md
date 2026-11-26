@@ -1,6 +1,6 @@
 # FAQ Camton Live
 
-Version publiée le 2 décembre 2026, avec la destination TikTok.
+Version publiée le 2 décembre 2026, avec la destination TikTok et le relais.
 
 ## Camton Live diffuse-t-il vraiment en direct ?
 
@@ -18,7 +18,15 @@ YouTube Studio → **Créer** → **Passer au direct** → **Gérer** → **Prog
 
 La destination est disponible **depuis le 2 décembre 2026**. Il faut l'adresse du serveur et la clé de flux fournies par l'application TikTok. Deux différences avec Twitch : la clé change à chaque direct, et l'accès au direct dépend du compte et du pays.
 
-Camton Live n'utilise aucune API non officielle. Si ton compte n'a pas l'option de clé de flux, un service de relais (Restream, Streamlabs) reste la solution.
+Camton Live n'utilise aucune API non officielle.
+
+## TikTok ne me donne pas de clé, un relais aide-t-il ?
+
+Oui pour le cas de la clé. La carte **Relais** accepte l'adresse et la clé d'un service de multidiffusion (Restream, Streamlabs) ou d'un serveur RTMP personnel : le relais fournit sa propre clé et pousse ensuite vers TikTok.
+
+Non pour l'éligibilité. Si TikTok refuse le direct à ton compte, le relais échouera aussi : l'autorisation vient de la plateforme, pas de l'intermédiaire.
+
+Un relais a un autre avantage : un seul flux sort de ton PC, même si tu diffuses sur trois plateformes.
 
 ## Mes clés partent-elles sur un serveur ?
 

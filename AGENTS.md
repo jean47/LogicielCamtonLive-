@@ -57,7 +57,7 @@ npm run desktop:win    # ffmpeg:fetch + build + electron-builder (ZIP portable)
 - `src/release-notes.json` doit porter la même version que `package.json` (test dédié dans `src/whats-new.test.js`).
 - À chaque version publiée : le manifeste `latest.json` (version, `downloadUrl`, `sha256`, `releaseNotes`) est généré par `release.yml` et déposé en asset de la release. L’application n’interroge que `releases/latest/download/latest.json` : pas de second hébergement à maintenir.
 - `docs/guide-destinations.md` et `docs/faq.md` sont les versions publiables du guide (« où trouver quoi » pour Twitch, YouTube, TikTok) et de la FAQ. L’application embarque le même contenu dans `openGuide()` / `openFaq()` : toute correction doit être reportée aux deux endroits.
-- Destinations : `twitch` (clé seule), `youtube` et `tiktok` (adresse RTMP(S) + clé). Une destination se déclare dans `src/platforms.js`, `index.html` (carte), `electron/secret-store.cjs` (`SUPPORTED` + validation) et `electron/stream-engine.cjs` (`destinationFor` + liste blanche). La clé TikTok est liée à une session : elle est recopiée à chaque direct.
+- Destinations : `twitch` (clé seule), `youtube`, `tiktok` et `relay` (adresse RTMP(S) + clé). Le relais est une sortie générique vers Restream, Streamlabs ou un serveur RTMP personnel : même chemin que TikTok, sans validation d’hôte. Une destination se déclare dans `src/platforms.js`, `index.html` (carte), `electron/secret-store.cjs` (`SUPPORTED` + validation) et `electron/stream-engine.cjs` (`destinationFor` + liste blanche). La clé TikTok est liée à une session : elle est recopiée à chaque direct.
 
 ## Installateur Windows
 

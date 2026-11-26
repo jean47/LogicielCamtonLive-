@@ -1,8 +1,8 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
-const SUPPORTED = new Set(['twitch', 'youtube', 'tiktok']);
-const PLATFORM_LABELS = Object.freeze({ twitch: 'Twitch', youtube: 'YouTube', tiktok: 'TikTok' });
+const SUPPORTED = new Set(['twitch', 'youtube', 'tiktok', 'relay']);
+const PLATFORM_LABELS = Object.freeze({ twitch: 'Twitch', youtube: 'YouTube', tiktok: 'TikTok', relay: 'Relais' });
 const MAX_SECRET_LENGTH = 512;
 
 function assertSecret(value, label) {
@@ -15,8 +15,9 @@ function assertSecret(value, label) {
   return value;
 }
 
-// TikTok change d’hôte d’ingestion selon les régions : seule la forme RTMP(S)
-// est vérifiée, pas le domaine. YouTube, lui, n’a qu’un hôte officiel.
+// TikTok change d’hôte d’ingestion selon les régions et un relais appartient à
+// son fournisseur : seule la forme RTMP(S) est vérifiée, pas le domaine. YouTube,
+// lui, n’a qu’un hôte officiel.
 function validateIngestEndpoint(value, platform, { hostPattern = null, hint }) {
   const label = PLATFORM_LABELS[platform];
   const invalid = new Error(`Adresse d’ingestion ${label} invalide.`);
@@ -43,14 +44,14 @@ function validateYoutubeEndpoint(value) {
   });
 }
 
-function validateTiktokEndpoint(value) {
-  return validateIngestEndpoint(value, 'tiktok', {
-    hint: 'Utilise l’adresse RTMP(S) fournie par l’application TikTok.',
-  });
-}
+const GENERIC_HINTS = Object.freeze({
+  tiktok: 'Utilise l’adresse RTMP(S) fournie par l’application TikTok.',
+  relay: 'Utilise l’adresse RTMP(S) fournie par ton relais (Restream, Streamlabs).',
+});
 
 function endpointValidator(platform) {
-  return platform === 'tiktok' ? validateTiktokEndpoint : validateYoutubeEndpoint;
+  if (platform === 'youtube') return validateYoutubeEndpoint;
+  return (value) => validateIngestEndpoint(value, platform, { hint: GENERIC_HINTS[platform] });
 }
 
 function createSecretStore({ app, safeStorage }) {
@@ -89,7 +90,7 @@ function createSecretStore({ app, safeStorage }) {
 
   async function getStatus() {
     if (!encryptionAvailable()) {
-      return { available: false, twitch: false, youtube: false, tiktok: false };
+      return { available: false, twitch: false, youtube: false, tiktok: false, relay: false };
     }
     try {
       const data = await readAll();
@@ -98,9 +99,10 @@ function createSecretStore({ app, safeStorage }) {
         twitch: typeof data.twitch?.key === 'string' && data.twitch.key.length > 3,
         youtube: typeof data.youtube?.key === 'string' && typeof data.youtube?.endpoint === 'string',
         tiktok: typeof data.tiktok?.key === 'string' && typeof data.tiktok?.endpoint === 'string',
+        relay: typeof data.relay?.key === 'string' && typeof data.relay?.endpoint === 'string',
       };
     } catch {
-      return { available: true, twitch: false, youtube: false, tiktok: false, damaged: true };
+      return { available: true, twitch: false, youtube: false, tiktok: false, relay: false, damaged: true };
     }
   }
 

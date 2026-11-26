@@ -1,4 +1,4 @@
-# Guide des destinations : Twitch, YouTube et TikTok
+# Guide des destinations : Twitch, YouTube, TikTok et relais
 
 Ce guide explique où trouver chaque information demandée par Camton Live. Les menus des plateformes changent parfois ; si un intitulé diffère, cherche l'équivalent le plus proche.
 
@@ -60,10 +60,33 @@ Ce guide explique où trouver chaque information demandée par Camton Live. Les 
 
 ### Si tu n'as pas l'option « clé de flux »
 
-Deux solutions existent, aucune n'est fournie par Camton Live :
+Deux solutions existent :
 
-1. **Le relais** : tu pousses ton flux vers un service de multidiffusion (Restream, Streamlabs) qui se charge de TikTok. La clé du relais est stable, mais il faut un compte et parfois un abonnement.
+1. **Le relais** (intégré, voir la section suivante) : tu pousses ton flux vers un service de multidiffusion qui se charge de TikTok. La clé du relais est stable, mais il faut un compte et parfois un abonnement.
 2. **L'application TikTok** : certains comptes diffusent uniquement depuis l'application mobile ou l'outil de bureau TikTok. Dans ce cas, Camton Live ne peut pas s'y substituer.
+
+## Relais : passer par un intermédiaire
+
+La carte **Relais** accepte l'adresse et la clé de n'importe quel serveur RTMP(S) : service de multidiffusion (Restream, Streamlabs, Castr) ou serveur personnel (Nginx, MediaMTX).
+
+### Pourquoi passer par un relais
+
+- **Pas de clé de flux côté plateforme** : le relais fournit sa propre adresse et sa propre clé, et c'est lui qui pousse vers TikTok ou YouTube.
+- **Une seule remontée** : tu envoies un flux au relais, il le duplique. Deux plateformes ne coûtent plus deux fois ton débit montant.
+- **Changement de destination sans toucher Camton Live** : tu ajoutes ou retires une plateforme dans le relais, la clé reste la même.
+
+### Marche à suivre
+
+1. Crée le direct dans le relais et ajoute-y les plateformes visées.
+2. Copie l'**adresse du serveur** (par exemple `rtmps://live.restream.io:443/live`) et la **clé** du relais.
+3. Colle les deux dans Camton Live, carte **Relais**, puis coche « Ajouter à mon live ».
+4. Ne coche pas TikTok en plus du relais : le flux partirait deux fois.
+
+### Ce qu'un relais ne fait pas
+
+- Il ne donne pas l'accès à une plateforme qui refuse ton compte : si TikTok n'autorise pas le direct pour ton compte, le relais échouera au même endroit.
+- Il ajoute un intermédiaire : quelques centaines de millisecondes de latence et une dépendance à sa disponibilité.
+- Il ne remplace pas la vérification côté plateforme : regarde toujours l'état du direct dans l'outil du relais et dans la plateforme.
 
 ## Vérifier que ça part
 
