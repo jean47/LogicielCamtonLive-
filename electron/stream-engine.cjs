@@ -10,42 +10,120 @@ const PROFILES = Object.freeze({
 const MAX_CHUNK_BYTES = 4 * 1024 * 1024;
 const STOP_TIMEOUT_MS = 3000;
 
-function assertRequiredEncoders(executable) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(executable, ['-hide_banner', '-encoders'], {
-      windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+const PROBE_TIMEOUT_MS = 8000;
+
+// La build FFmpeg embarquée est LGPL : pas de libx264. On essaie donc les encodeurs
+// matériels disponibles sur Windows, du plus efficace au plus universel. Chacun est
+// validé par un encodage réel, car la simple présence dans `-encoders` ne garantit
+// pas qu'il démarre (pilotes absents, Media Foundation incomplète, VM sans GPU).
+const VIDEO_ENCODERS = Object.freeze([
+  {
+    name: 'h264_nvenc',
+    label: 'NVIDIA NVENC',
+    pixFmt: 'nv12',
+    options: (profile) => ['-preset', 'p5', '-tune', 'll', '-rc', 'cbr',
+      '-b:v', `${profile.bitrate}k`, '-maxrate', `${profile.bitrate}k`,
+      '-bufsize', `${profile.bitrate * 2}k`, '-g', String(profile.fps * 2), '-bf', '0'],
+  },
+  {
+    name: 'h264_qsv',
+    label: 'Intel Quick Sync',
+    pixFmt: 'nv12',
+    options: (profile) => ['-preset', 'veryfast',
+      '-b:v', `${profile.bitrate}k`, '-maxrate', `${profile.bitrate}k`,
+      '-bufsize', `${profile.bitrate * 2}k`, '-g', String(profile.fps * 2)],
+  },
+  {
+    name: 'h264_amf',
+    label: 'AMD AMF',
+    pixFmt: 'nv12',
+    options: (profile) => ['-quality', 'speed', '-rc', 'cbr',
+      '-b:v', `${profile.bitrate}k`, '-maxrate', `${profile.bitrate}k`,
+      '-bufsize', `${profile.bitrate * 2}k`, '-g', String(profile.fps * 2)],
+  },
+  {
+    name: 'h264_mf',
+    label: 'Windows Media Foundation',
+    pixFmt: 'nv12',
+    options: (profile) => ['-rate_control', 'cbr', '-scenario', 'live_streaming',
+      '-b:v', `${profile.bitrate}k`, '-maxrate', `${profile.bitrate}k`,
+      '-bufsize', `${profile.bitrate * 2}k`, '-g', String(profile.fps * 2), '-bf', '0'],
+  },
+]);
+const DEFAULT_ENCODER_NAME = 'h264_mf';
+
+function encoderByName(name) {
+  return VIDEO_ENCODERS.find((encoder) => encoder.name === name) || VIDEO_ENCODERS[VIDEO_ENCODERS.length - 1];
+}
+
+function runFfmpeg(executable, args, spawnProcess, { timeoutMs = PROBE_TIMEOUT_MS, collect = false } = {}) {
+  return new Promise((resolve) => {
+    let child;
+    try {
+      child = spawnProcess(executable, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch {
+      resolve({ ok: false, output: '' });
+      return;
+    }
     let output = '';
-    child.stdout.setEncoding('utf8');
-    child.stderr.setEncoding('utf8');
-    child.stdout.on('data', (chunk) => { output += chunk; });
-    child.stderr.on('data', (chunk) => { output += chunk; });
-    child.once('error', () => reject(new Error('FFmpeg ne peut pas être exécuté. Vérifie les DLL du paquet Windows.')));
-    child.once('close', (code) => {
-      if (code !== 0) {
-        reject(new Error('Impossible de vérifier les encodeurs FFmpeg du paquet Windows.'));
-        return;
-      }
-      if (!/^\s*V.{5}\s+h264_mf\b/m.test(output)) {
-        reject(new Error('L’encodeur H.264 Media Foundation est absent de ce paquet Windows.'));
-        return;
-      }
-      if (!/^\s*A.{5}\s+aac\b/m.test(output)) {
-        reject(new Error('L’encodeur audio AAC est absent de ce paquet Windows.'));
-        return;
-      }
-      resolve();
-    });
+    const keep = (chunk) => { if (collect) output += chunk; };
+    child.stdout?.setEncoding?.('utf8');
+    child.stderr?.setEncoding?.('utf8');
+    child.stdout?.on('data', keep);
+    child.stderr?.on('data', keep);
+    const timer = setTimeout(() => {
+      try { child.kill(); } catch { /* déjà terminé */ }
+      resolve({ ok: false, output });
+    }, timeoutMs);
+    child.once('error', () => { clearTimeout(timer); resolve({ ok: false, output }); });
+    child.once('close', (code) => { clearTimeout(timer); resolve({ ok: code === 0, output }); });
   });
+}
+
+async function readEncoderNames(executable, spawnProcess) {
+  const { output } = await runFfmpeg(executable, ['-hide_banner', '-encoders'], spawnProcess, { collect: true });
+  const names = new Set();
+  for (const line of output.split(/\r?\n/)) {
+    const match = /^\s*([VAS])\.{0,5}[A-Z.]{0,5}\s+(\S+)/.exec(line);
+    if (match) names.add(match[2]);
+  }
+  return names;
+}
+
+function probeEncoder(executable, encoder, profile, spawnProcess) {
+  const args = [
+    '-hide_banner', '-loglevel', 'error',
+    '-f', 'lavfi', '-i', 'testsrc2=size=640x360:rate=30',
+    '-frames:v', '5',
+    '-c:v', encoder.name, ...encoder.options(profile), '-pix_fmt', encoder.pixFmt,
+    '-an', '-f', 'null', '-',
+  ];
+  return runFfmpeg(executable, args, spawnProcess).then((result) => result.ok);
+}
+
+function normalizeEndpoint(raw) {
+  return String(raw || '').trim().replace(/\/+$/, '');
+}
+
+// YouTube accepte RTMPS sur 443 alors que RTMP 1935 est bloqué par beaucoup de
+// box et de réseaux d'entreprise : les deux formes sont ramenées vers 443.
+function normalizeYoutubeEndpoint(endpoint) {
+  const base = normalizeEndpoint(endpoint);
+  if (!base) return '';
+  if (/^rtmps?:\/\/a\.rtmps?\.youtube\.com(:\d+)?\/live2(\/.*)?$/i.test(base)) {
+    return 'rtmps://a.rtmps.youtube.com:443/live2';
+  }
+  return base.replace(/\/live2\/.+$/, '/live2');
 }
 
 function destinationFor(platform, credentials) {
   if (platform === 'twitch' && credentials?.twitch?.key) {
-    return `rtmps://live.twitch.tv:443/app/${credentials.twitch.key}`;
+    return `rtmps://live.twitch.tv:443/app/${String(credentials.twitch.key).trim()}`;
   }
-  if (platform === 'youtube' && credentials?.youtube?.endpoint && credentials.youtube.key) {
-    return `${credentials.youtube.endpoint}/${credentials.youtube.key}`;
+  if (platform === 'youtube') {
+    const endpoint = normalizeYoutubeEndpoint(credentials?.youtube?.endpoint);
+    const key = String(credentials?.youtube?.key || '').trim();
+    if (endpoint && key) return `${endpoint}/${key}`;
   }
   throw new Error('Les paramètres de diffusion de cette destination sont incomplets.');
 }
@@ -60,18 +138,40 @@ function safeFailureMessage(text) {
   return 'L’encodeur a arrêté cette sortie. Vérifie la source et essaie un profil de qualité inférieur.';
 }
 
-function buildFfmpegArgs(profile, outputUrl) {
+function buildFfmpegArgs(profile, outputUrl, encoderName = DEFAULT_ENCODER_NAME) {
+  const encoder = encoderByName(encoderName);
   const vf = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2:color=black,fps=${profile.fps},format=nv12`;
   return [
-    '-hide_banner', '-nostdin', '-nostats', '-loglevel', 'warning', '-stats_period', '1', '-progress', 'pipe:1',
-    '-thread_queue_size', '512', '-f', 'webm', '-i', 'pipe:0',
+    '-hide_banner', '-nostdin', '-nostats', '-loglevel', 'info', '-stats_period', '1', '-progress', 'pipe:1',
+    '-fflags', '+genpts', '-thread_queue_size', '512', '-f', 'webm', '-i', 'pipe:0',
     '-map', '0:v:0', '-map', '0:a:0?', '-vf', vf,
-    '-c:v', 'h264_mf', '-rate_control', 'cbr', '-scenario', 'live_streaming',
-    '-b:v', `${profile.bitrate}k`, '-maxrate', `${profile.bitrate}k`,
-    '-bufsize', `${profile.bitrate * 2}k`, '-g', String(profile.fps * 2), '-bf', '0',
-    '-pix_fmt', 'nv12', '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-ac', '2',
-    '-map_metadata', '-1', '-flvflags', 'no_duration_filesize', '-f', 'flv', outputUrl,
+    '-c:v', encoder.name, ...encoder.options(profile), '-pix_fmt', encoder.pixFmt,
+    '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-ac', '2',
+    '-map_metadata', '-1', '-flvflags', 'no_duration_filesize',
+    '-max_muxing_queue_size', '1024', '-f', 'flv', outputUrl,
   ];
+}
+
+async function writeDiagnostic(app, session) {
+  try {
+    const stamp = session.at.replace(/[:.]/g, '-');
+    const target = path.join(app.getPath('desktop'), `Camton-Live-diagnostic-${stamp}.txt`);
+    const lines = [
+      'Rapport Camton Live',
+      `Date : ${session.at}`,
+      `Destination : ${session.platform}`,
+      `Code de sortie FFmpeg : ${session.code}`,
+      `Encodeur : ${session.encoder ? `${session.encoder.name} (${session.encoder.label}), validé : ${session.encoder.verified ? 'oui' : 'non'}` : 'inconnu'}`,
+      '',
+      'Dernières lignes FFmpeg :',
+      ...session.stderr.slice(-30),
+      '',
+    ];
+    await fs.writeFile(target, lines.join('\n'), 'utf8');
+    return target;
+  } catch {
+    return null;
+  }
 }
 
 function createStreamEngine({ app, emit, deps = {} }) {
@@ -82,6 +182,9 @@ function createStreamEngine({ app, emit, deps = {} }) {
     ? path.join(process.resourcesPath, 'ffmpeg', 'bin', 'ffmpeg.exe')
     : path.join(__dirname, '..', 'vendor', 'ffmpeg', 'win-x64', 'bin', 'ffmpeg.exe')));
   const children = new Map();
+  const encoderCache = new Map();
+  let sessionEncoder = null;
+  let lastSession = null;
   let stopping = false;
 
   function publish(platform, status, message) {
@@ -101,7 +204,10 @@ function createStreamEngine({ app, emit, deps = {} }) {
         const frame = line.match(/^frame=(\d+)/);
         if (frame && Number(frame[1]) > 0 && !entry.sawFrame) {
           entry.sawFrame = true;
-          if (!stopping) publish(platform, 'encoding', 'Encodage local actif; vérifie la réception dans la plateforme.');
+          if (!stopping) {
+            const label = sessionEncoder ? ` (${sessionEncoder.label})` : '';
+            publish(platform, 'encoding', `Encodage local actif${label}; vérifie la réception dans la plateforme.`);
+          }
         }
       }
     });
@@ -113,34 +219,55 @@ function createStreamEngine({ app, emit, deps = {} }) {
       const lines = logPending.split(/\r\n|\n|\r/);
       logPending = lines.pop() || '';
       for (const line of lines) {
-        if (/\b(error|failed|failure)\b/i.test(line)) entry.lastErrorText = line;
+        if (!line.trim()) continue;
+        entry.stderrTail.push(line);
+        if (entry.stderrTail.length > 40) entry.stderrTail.shift();
+        if (/\b(error|failed|failure|invalid|impossible)\b/i.test(line)) entry.lastErrorText = line;
       }
     });
     child.on('error', () => {
       if (!stopping) publish(platform, 'error', 'Impossible de démarrer l’encodeur Windows.');
     });
-    child.on('close', (code) => {
+    child.on('close', async (code) => {
       if (stopping) return;
       const current = children.get(platform);
       if (!current || current.child !== child) return;
       children.delete(platform);
+      lastSession = { platform, code, encoder: sessionEncoder, stderr: [...current.stderrTail], at: new Date().toISOString() };
+      const base = code === 0
+        ? 'La sortie s’est arrêtée sans action de l’utilisateur. Vérifie la plateforme et la source.'
+        : safeFailureMessage(current.lastErrorText || '');
+      const report = code === 0 ? null : await writeDiagnostic(app, lastSession);
       emit({
         type: 'destination',
         platform,
         status: 'error',
-        message: code === 0
-          ? 'La sortie s’est arrêtée sans action de l’utilisateur. Vérifie la plateforme et la source.'
-          : safeFailureMessage(current.lastErrorText || ''),
+        message: report ? `${base} Rapport détaillé : ${path.basename(report)} sur le Bureau.` : base,
       });
     });
   }
 
-  function spawnOutput(executable, profile, platform, outputUrl) {
-    const child = spawnProcess(executable, buildFfmpegArgs(profile, outputUrl), {
+  async function selectEncoder(executable, profile, candidates) {
+    const cached = encoderCache.get(executable);
+    const remembered = cached && candidates.find((candidate) => candidate.name === cached);
+    if (remembered) return { encoder: remembered, verified: true };
+    for (const candidate of candidates) {
+      if (await probeEncoder(executable, candidate, profile, spawnProcess)) {
+        encoderCache.set(executable, candidate.name);
+        return { encoder: candidate, verified: true };
+      }
+    }
+    // Le sondage peut échouer pour une raison passagère : on tente quand même le
+    // premier encodeur disponible, le direct tranchera.
+    return { encoder: candidates[0], verified: false };
+  }
+
+  function spawnOutput(executable, profile, platform, outputUrl, encoderName) {
+    const child = spawnProcess(executable, buildFfmpegArgs(profile, outputUrl, encoderName), {
       windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
-    const entry = { child, status: 'connecting', sawFrame: false, lastErrorText: '' };
+    const entry = { child, status: 'connecting', sawFrame: false, lastErrorText: '', stderrTail: [] };
     children.set(platform, entry);
     publish(platform, 'connecting', 'Connexion au point d’ingestion…');
     watchOutput(platform, child, entry);
@@ -199,12 +326,17 @@ function createStreamEngine({ app, emit, deps = {} }) {
     } catch {
       throw new Error('Encodeur FFmpeg absent. Reconstruis le paquet Windows avec la commande indiquée dans le guide.');
     }
-    await assertRequiredEncoders(executable);
+    const encoderNames = await readEncoderNames(executable, spawnProcess);
+    if (!encoderNames.has('aac')) throw new Error('L’encodeur audio AAC est absent de ce paquet Windows.');
+    const candidates = VIDEO_ENCODERS.filter((encoder) => encoderNames.has(encoder.name));
+    if (!candidates.length) throw new Error('Aucun encodeur H.264 n’est disponible dans ce paquet Windows.');
+    const selection = await selectEncoder(executable, profile, candidates);
+    sessionEncoder = { name: selection.encoder.name, label: selection.encoder.label, verified: selection.verified };
 
     stopping = false;
     try {
       for (const destination of destinations) {
-        spawnOutput(executable, profile, destination.platform, destination.outputUrl);
+        spawnOutput(executable, profile, destination.platform, destination.outputUrl, sessionEncoder.name);
       }
     } catch (error) {
       const started = [...children.entries()];
@@ -245,7 +377,22 @@ function createStreamEngine({ app, emit, deps = {} }) {
     return { accepted: true, failedOutputs: failures };
   }
 
-  return Object.freeze({ start, pushChunk, stop, isActive: () => children.size > 0 });
+  function getDiagnostics() {
+    return {
+      encoder: sessionEncoder,
+      lastSession,
+      outputs: [...children.entries()].map(([platform, entry]) => ({
+        platform,
+        status: entry.status,
+        sawFrame: entry.sawFrame,
+        stderr: entry.stderrTail.slice(-20),
+      })),
+    };
+  }
+
+  return Object.freeze({ start, pushChunk, stop, getDiagnostics, isActive: () => children.size > 0 });
 }
 
-module.exports = { createStreamEngine, PROFILES, destinationFor, buildFfmpegArgs, safeFailureMessage };
+module.exports = {
+  createStreamEngine, PROFILES, VIDEO_ENCODERS, destinationFor, buildFfmpegArgs, safeFailureMessage,
+};

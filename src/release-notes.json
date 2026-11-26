@@ -1,11 +1,10 @@
 {
-  "version": "0.4.4",
+  "version": "0.4.5",
   "notes": [
-    "Table de mixage multi-pistes : micro principal, second micro, son de la source et musique. Chaque piste a son volume, son muet, son solo et son vu-mètre.",
-    "Master général : un seul volume et un coupe-son pour tout le direct.",
-    "Nouvelle piste musique depuis un fichier audio local, jouée en boucle.",
-    "Les réglages de mixage sont mémorisés d’une session à l’autre.",
-    "Un seul moteur audio pour toute l’application : plus un contexte audio créé par vu-mètre.",
-    "Ce pop-up « Quoi de neuf » s’affiche après chaque mise à jour pour résumer les changements."
+    "L’encodeur choisit maintenant tout seul le meilleur H.264 disponible sur ton PC : NVIDIA, Intel, AMD, puis Media Foundation. Chaque candidat est testé sur une vraie image avant le direct, fini les plantages au démarrage.",
+    "YouTube : l’adresse RTMP du port 1935 est automatiquement convertie en RTMPS sécurisé sur le port 443, celui que les box et les réseaux d’entreprise laissent passer. Une clé collée par erreur dans l’adresse est retirée.",
+    "Piste « Son de la source » : le son système est capté même sur une fenêtre, en ouvrant une capture d’écran dédiée à l’audio.",
+    "En cas d’échec, un rapport détaillé est écrit sur le Bureau : encodeur utilisé, code de sortie et dernières lignes FFmpeg.",
+    "Les messages d’erreur nomment l’encodeur actif et distinguent une clé refusée d’une connexion bloquée."
   ]
 }

@@ -8,10 +8,10 @@ Camton Live est un studio de streaming en français qui s’ouvre dans sa propre
 
 Deux formats sont livrés :
 
-- **`Camton-Live-Setup-0.4.4-x64.exe`** (recommandé) : installation par utilisateur dans `%LOCALAPPDATA%\Programs\Camton Live`, sans droits administrateur. Raccourcis sur le bureau et dans le menu Démarrer, désinstallation propre, prise en charge de l’installation silencieuse (`/S`) utilisée par les mises à jour.
-- **`Camton-Live-Portable-0.4.4-x64.zip`** : décompresse l’archive, puis lance `Camton Live.exe`. À garder dans son dossier, pas seul sur le bureau.
+- **`Camton-Live-Setup-0.4.5-x64.exe`** (recommandé) : installation par utilisateur dans `%LOCALAPPDATA%\Programs\Camton Live`, sans droits administrateur. Raccourcis sur le bureau et dans le menu Démarrer, désinstallation propre, prise en charge de l’installation silencieuse (`/S`) utilisée par les mises à jour.
+- **`Camton-Live-Portable-0.4.5-x64.zip`** : décompresse l’archive, puis lance `Camton Live.exe`. À garder dans son dossier, pas seul sur le bureau.
 
-Les deux versions partagent les mêmes réglages (mêmes identifiants d’application), donc installer la 0.4.4 par-dessus une version portable conserve ton mixage et tes clés. Les exécutables ne sont pas signés : Windows peut afficher SmartScreen (« Informations complémentaires » puis « Exécuter quand même »). Le paquet comprend FFmpeg et ses composants LGPL partagés, avec les avis de licence dans `resources/licenses/`.
+Les deux versions partagent les mêmes réglages (mêmes identifiants d’application), donc installer la 0.4.5 par-dessus une version portable conserve ton mixage et tes clés. Les exécutables ne sont pas signés : Windows peut afficher SmartScreen (« Informations complémentaires » puis « Exécuter quand même »). Le paquet comprend FFmpeg et ses composants LGPL partagés, avec les avis de licence dans `resources/licenses/`. L’encodeur H.264 est choisi au démarrage parmi NVIDIA NVENC, Intel Quick Sync, AMD AMF et Media Foundation, chacun validé par un encodage d’essai.
 
 ## Configurer une destination
 

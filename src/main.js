@@ -33,6 +33,7 @@ const state = {
   stopRequested: false,
   mediaRecorder: null,
   mixedStream: null,
+  auxAudioStream: null,
   chunkQueue: Promise.resolve(),
   queuedBytes: 0,
   toastTimer: null,
@@ -238,7 +239,9 @@ function stopTracks(stream) {
 
 function stopSource({ stopMic = true } = {}) {
   stopTracks(state.sourceStream);
+  stopTracks(state.auxAudioStream);
   state.sourceStream = null;
+  state.auxAudioStream = null;
   $('#previewVideo').srcObject = null;
   $('#previewFrame').classList.remove('has-video');
   $('#previewOverlay').classList.remove('visible');
@@ -852,6 +855,26 @@ function openGuide() {
   });
 }
 
+// Windows ne fournit le son système (loopback) que pour la capture d'un écran,
+// pas d'une fenêtre : on ouvre alors une capture d'écran supplémentaire dont on
+// ne garde que l'audio, pour alimenter la piste « Son de la source ».
+async function captureLoopbackAudio() {
+  if (!desktop?.isDesktopApp) return null;
+  const sources = await desktop.listCaptureSources();
+  const screen = sources.find((item) => String(item.id).startsWith('screen:'));
+  if (!screen) return null;
+  await desktop.selectCaptureSource(screen.id);
+  const stream = await navigator.mediaDevices.getDisplayMedia({
+    video: { frameRate: { ideal: 5, max: 10 } },
+    audio: true,
+  });
+  if (!stream.getAudioTracks().length) {
+    stopTracks(stream);
+    return null;
+  }
+  return stream;
+}
+
 async function startDesktopCapture(source) {
   try {
     let stream;
@@ -867,7 +890,15 @@ async function startDesktopCapture(source) {
     } catch (error) {
       if (['NotAllowedError', 'PermissionDeniedError', 'AbortError'].includes(error?.name)) throw error;
       stream = await capture(false);
-      showToast('Aperçu vidéo actif. Le son système n’est pas disponible sur cette configuration; le micro reste requis.', 'warning');
+    }
+    if (!stream.getAudioTracks().length) {
+      const loopback = await captureLoopbackAudio().catch(() => null);
+      if (loopback) {
+        state.auxAudioStream = loopback;
+        stream = new MediaStream([...stream.getVideoTracks(), ...loopback.getAudioTracks()]);
+      } else {
+        showToast('Aucun son système capté. Pour le son d’un jeu ou d’une vidéo, choisis « Écran » dans la liste des sources.', 'warning');
+      }
     }
     await startPreview(stream, source.name || 'Écran / fenêtre PC');
   } catch (error) {

@@ -20,13 +20,21 @@ const ENCODERS = `Encoders:
  V....D h264_mf              H264 via MediaFoundation (codec h264)
  A....D aac                  AAC (Advanced Audio Coding)`;
 
-function ffmpegStub({ encoders = ENCODERS, fail = '' } = {}) {
+function ffmpegStub({ encoders = ENCODERS, fail = '', failProbe = [] } = {}) {
   const probe = `if [ "$1" = "-hide_banner" ] && [ "$2" = "-encoders" ]; then
   cat <<'LIST'
 ${encoders}
 LIST
   exit 0
 fi`;
+  const probeGuard = failProbe.length
+    ? `case "$*" in
+  *testsrc2*)
+    for rejected in ${failProbe.join(' ')}; do
+      case "$*" in *"$rejected"*) exit 1 ;; esac
+    done ;;
+esac`
+    : '';
   const body = fail
     ? `printf '%s\\n' "${fail}" >&2
 exit 1`
@@ -36,6 +44,7 @@ printf 'frame=2\\n'
 exit 0`;
   return `#!/bin/sh
 ${probe}
+${probeGuard}
 ${body}
 `;
 }
@@ -91,6 +100,28 @@ test('the stream is re-encoded to H.264/AAC with optional audio and FLV output',
   assert.ok(args.includes('0:a:0?'), 'l’audio de la source reste optionnel');
   assert.equal(args[args.lastIndexOf('-f') + 1], 'flv');
   assert.equal(args[args.indexOf('-f') + 1], 'webm', 'le WebM produit par MediaRecorder est décodé');
+});
+
+test('YouTube ingest addresses are normalised to RTMPS on port 443', () => {
+  const cases = [
+    'rtmp://a.rtmp.youtube.com/live2',
+    'rtmp://a.rtmp.youtube.com/live2/',
+    'rtmps://a.rtmps.youtube.com:443/live2',
+    'rtmps://a.rtmps.youtube.com:443/live2/',
+    'rtmps://a.rtmps.youtube.com:443/live2/ancienne-cle',
+  ];
+  for (const endpoint of cases) {
+    assert.equal(
+      destinationFor('youtube', { youtube: { endpoint, key: ' cle ' } }),
+      'rtmps://a.rtmps.youtube.com:443/live2/cle',
+      `${endpoint} doit aboutir à une adresse unique`,
+    );
+  }
+  assert.equal(
+    destinationFor('youtube', { youtube: { endpoint: 'rtmp://192.168.1.20:1935/live2', key: 'k' } }),
+    'rtmp://192.168.1.20:1935/live2/k',
+    'un serveur local reste inchangé',
+  );
 });
 
 test('destinations are built from the encrypted credentials only', () => {
@@ -163,10 +194,28 @@ test('duplicate, unknown, empty and concurrent sessions are refused', async (t) 
   await engine.stop();
 });
 
-test('a build without the Media Foundation encoder is rejected before going live', async (t) => {
+test('a build without any H.264 encoder is rejected before going live', async (t) => {
   const { engine } = harness(t, { encoders: ENCODERS.replace(/^.*h264_mf.*$/m, '') });
-  await assert.rejects(engine.start({ platforms: ['twitch'], profileName: 'balanced', credentials: CREDENTIALS }), /H\.264 Media Foundation est absent/);
+  await assert.rejects(engine.start({ platforms: ['twitch'], profileName: 'balanced', credentials: CREDENTIALS }), /Aucun encodeur H\.264/);
   assert.equal(engine.isActive(), false);
+});
+
+test('the encoder ladder keeps the first candidate that really encodes', async (t) => {
+  const ladder = ENCODERS.replace(' V....D h264_mf', ' V....D h264_nvenc           NVIDIA NVENC\n V....D h264_mf');
+  const { engine, events } = harness(t, { encoders: ladder });
+  await engine.start({ platforms: ['twitch'], profileName: 'smooth', credentials: CREDENTIALS });
+  const encoding = await waitFor(events, (event) => event.status === 'encoding');
+  assert.match(encoding.message, /NVIDIA NVENC/);
+  await engine.stop();
+});
+
+test('a candidate the machine cannot run is skipped for the next one', async (t) => {
+  const ladder = ENCODERS.replace(' V....D h264_mf', ' V....D h264_nvenc           NVIDIA NVENC\n V....D h264_mf');
+  const { engine, events } = harness(t, { encoders: ladder, failProbe: ['h264_nvenc'] });
+  await engine.start({ platforms: ['twitch'], profileName: 'smooth', credentials: CREDENTIALS });
+  const encoding = await waitFor(events, (event) => event.status === 'encoding');
+  assert.match(encoding.message, /Windows Media Foundation/);
+  await engine.stop();
 });
 
 test('a build without the AAC encoder is rejected before going live', async (t) => {
