@@ -1,0 +1,38 @@
+name: Publication différée — 0.5.1 (TikTok)
+
+# Publie la 0.5.1 le 2 décembre 2026 à 10:00 à Paris (09:00 UTC, heure d'hiver).
+# C'est la version qui active la destination TikTok.
+#
+# La cible est le commit de la fonctionnalité TikTok. Si du code livrable apparaît
+# sur la branche sans changement de version d'ici là, le garde-fou échoue au lieu de
+# publier une version amputée du correctif.
+on:
+  schedule:
+    - cron: '0 9 2 12 *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  garde:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: La cible couvre-t-elle le code publié ?
+        shell: bash
+        run: bash .github/scripts/guard-release.sh .github/workflows/publish-0-5-1.yml
+
+  publish:
+    needs: garde
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: v0.5.1
+      target: 2a940309ad49db5cfbc6ce0495643769758c9ca0
