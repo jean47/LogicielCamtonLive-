@@ -1,10 +1,10 @@
 {
-  "version": "0.5.1",
+  "version": "0.5.2",
   "notes": [
-    "TikTok : nouvelle destination. Colle l’adresse du serveur et la clé de flux fournies par l’application TikTok, puis ajoute la destination à ton live.",
-    "Relais : nouvelle destination aussi. Restream, Streamlabs ou un serveur RTMP personnel reçoit un seul flux et le répartit vers TikTok, YouTube ou Twitch.",
-    "Un relais dépanne quand une plateforme ne te donne pas de clé de flux ; il ne débloque pas un compte que la plateforme refuse.",
-    "Le guide et la FAQ expliquent où trouver chaque clé et comment passer par un relais.",
+    "Supervision des sorties : chaque destination affiche son débit réel, ses images par seconde et les images perdues, au lieu du seul « Encodage actif ».",
+    "Test de débit montant : une mesure de quelques secondes dit si le préréglage choisi passe, avec de la marge ou pas du tout.",
+    "Quatre destinations au lieu de deux. Au-delà de deux, l’application rappelle qu’un relais consomme moins de bande montante.",
+    "Signaler un problème : un rapport local part sur ton Bureau, clés masquées, et une issue GitHub préremplie s’ouvre. Rien ne part sans ton clic.",
     "Camton Live reste en bêta jusqu’à la version 1.0.0."
   ]
 }

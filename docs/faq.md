@@ -28,6 +28,18 @@ Non pour l'éligibilité. Si TikTok refuse le direct à ton compte, le relais é
 
 Un relais a un autre avantage : un seul flux sort de ton PC, même si tu diffuses sur trois plateformes.
 
+## Comment savoir si mon direct part vraiment ?
+
+Chaque carte de destination affiche, pendant le direct, le débit réellement encodé, les images par seconde et les images perdues. C'est une mesure locale : elle prouve que l'encodeur produit un flux stable, pas que la plateforme l'accepte. La réception se vérifie dans l'outil de la plateforme.
+
+## Puis-je diffuser sur quatre plateformes ?
+
+Oui, jusqu'à quatre. Chacune consomme son propre débit montant : trois destinations en « Équilibré », c'est environ 13,5 Mb/s. Au-delà de deux, un relais (Restream, Streamlabs) reste plus économe : un seul envoi, il répartit.
+
+## Comment signaler un bug ?
+
+Le lien **Signaler un problème** de la barre latérale écrit un rapport sur ton Bureau et ouvre une issue GitHub préremplie. Le rapport contient la version, ton système, l'encodeur et les dernières lignes de FFmpeg ; les clés y sont masquées. Rien ne part sans ton clic, et l'application n'envoie aucune donnée à un serveur Camton Live.
+
 ## Mes clés partent-elles sur un serveur ?
 
 Non. Elles sont chiffrées sur ton PC avec le stockage sécurisé de Windows (`safeStorage`) et ne sont jamais réaffichées dans l'application. Pendant un direct, l'adresse complète est passée à FFmpeg : elle peut donc apparaître dans un outil local d'inspection des processus. Aucune clé n'est envoyée à un serveur Camton Live, il n'y en a pas.

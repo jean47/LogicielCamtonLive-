@@ -482,6 +482,17 @@ select:hover { border-color: #514680; }
 .platform-logo--tiktok { background: rgba(57, 200, 255, .12); color: #8adcff; }
 .platform-logo--relay { background: rgba(126, 231, 190, .12); color: #7ee7be; }
 
+.platform-stats {
+  display: none;
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .02em;
+  color: var(--text-soft);
+}
+
+.platform-stats.visible { display: block; }
+
 .platform-card h3 { font-size: var(--fs-base); }
 .platform-card p { flex: 1; font-size: var(--fs-xs); line-height: 1.55; color: var(--text-muted); }
 
@@ -610,6 +621,23 @@ select:hover { border-color: #514680; }
 
 .quality-head h3 { font-size: var(--fs-base); }
 .quality-head p { font-size: var(--fs-xs); color: var(--text-muted); }
+
+.speed-test {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.speed-test-result { flex: 1 1 240px; font-size: var(--fs-xs); color: var(--text-muted); }
+
+.speed-test-result[data-level="ok"] { color: #7ee7be; }
+.speed-test-result[data-level="tight"] { color: #fbc45e; }
+.speed-test-result[data-level="short"],
+.speed-test-result[data-level="error"] { color: #ff8d93; }
 
 .quality-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 
@@ -831,6 +859,22 @@ select:hover { border-color: #514680; }
   font-weight: 500;
   outline: none;
 }
+
+.credential-field textarea {
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: #0d0c18;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  resize: vertical;
+  min-height: 88px;
+}
+
+.credential-field textarea::placeholder { color: #6b6383; }
+.credential-field textarea:focus { border-color: rgba(251, 196, 94, .6); box-shadow: 0 0 0 3px rgba(251, 196, 94, .12); outline: none; }
 
 .credential-field input::placeholder { color: #6b6383; }
 .credential-field input:focus { border-color: rgba(251, 196, 94, .6); box-shadow: 0 0 0 3px rgba(251, 196, 94, .12); }

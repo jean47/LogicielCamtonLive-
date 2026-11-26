@@ -3,6 +3,7 @@ import { createCompositor } from './compositor.js';
 import { createAudioDesk } from './audio-desk.js';
 import releaseNotes from './release-notes.json';
 import { parseNotes, shouldAnnounce } from './whats-new.js';
+import { describeMeasurement } from './speed-verdict.js';
 import './styles/index.css';
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -544,6 +545,7 @@ function updateCredentialStatus(status) {
     const input = $(`[data-platform="${platform}"]`);
     input.disabled = !state.credentialStatus.available || !configured;
     if (!configured) input.checked = false;
+    renderDestinationStats(platform);
   }
   const configuredCount = PLATFORM_IDS.filter((id) => state.credentialStatus[id]).length;
   $('#platformSectionStatus').innerHTML = state.credentialStatus.available
@@ -577,11 +579,38 @@ function updateBitrateNotice() {
   const profile = LIVE_PROFILES[state.quality] || LIVE_PROFILES.balanced;
   const selectedCount = state.selectedPlatforms.size;
   const totalMbps = ((profile.bitrate + 160) * selectedCount / 1000).toFixed(1);
-  $('#bitrateNotice').textContent = selectedCount > 1
-    ? `Estimation multistream : environ ${totalMbps} Mb/s sortants et plusieurs encodages simultanés. Prévois une marge réseau.`
-    : selectedCount === 1
+  $('#bitrateNotice').textContent = selectedCount > 2
+    ? `Estimation : environ ${totalMbps} Mb/s sortants et ${selectedCount} encodages simultanés. Au-delà de deux destinations, un relais coûte moins de bande montante.`
+    : selectedCount > 1
+      ? `Estimation multistream : environ ${totalMbps} Mb/s sortants et plusieurs encodages simultanés. Prévois une marge réseau.`
+      : selectedCount === 1
       ? `Débit vidéo estimé : ${profile.bitrate} kb/s, plus l’audio. La connexion doit garder une marge.`
       : 'Sélectionne une ou plusieurs destinations pour estimer le débit sortant.';
+}
+
+async function runSpeedTest() {
+  const button = $('#speedTestBtn');
+  const output = $('#speedTestResult');
+  const profile = LIVE_PROFILES[state.quality] || LIVE_PROFILES.balanced;
+  if (!desktop?.isDesktopApp) {
+    output.dataset.level = 'error';
+    output.textContent = 'La mesure passe par l’application Windows : l’aperçu web ne peut pas envoyer de données.';
+    return;
+  }
+  button.disabled = true;
+  output.dataset.level = '';
+  output.textContent = 'Mesure en cours, quelques secondes…';
+  try {
+    const result = await desktop.measureUpload();
+    const verdict = describeMeasurement({ mbps: result.mbps, profileKbps: profile.bitrate, label: profile.label });
+    output.dataset.level = verdict.level;
+    output.textContent = verdict.text;
+  } catch (error) {
+    output.dataset.level = 'error';
+    output.textContent = error?.message || 'La mesure a échoué.';
+  } finally {
+    button.disabled = false;
+  }
 }
 
 function selectQuality(value) {
@@ -750,8 +779,31 @@ function handlePlatformToggle(event) {
   updatePlatformSelection();
 }
 
+function formatStats(stats) {
+  const mbps = (stats.bitrateKbps / 1000).toFixed(1).replace('.', ',');
+  const dropped = stats.droppedFrames
+    ? `${stats.droppedFrames} image${stats.droppedFrames > 1 ? 's' : ''} perdue${stats.droppedFrames > 1 ? 's' : ''}`
+    : 'aucune image perdue';
+  return `${mbps} Mb/s · ${stats.fps} i/s · ${dropped}`;
+}
+
+function renderDestinationStats(platform) {
+  const element = $(`#${platform}Stats`);
+  if (!element) return;
+  const entry = state.streamStatuses[platform];
+  const visible = Boolean(entry?.stats) && entry.status === 'encoding';
+  element.textContent = visible ? formatStats(entry.stats) : '';
+  element.classList.toggle('visible', visible);
+}
+
 function renderDestinationStatus(update) {
   if (!PLATFORM_IDS.includes(update.platform)) return;
+  if (update.type === 'stats') {
+    const previous = state.streamStatuses[update.platform] || {};
+    state.streamStatuses[update.platform] = { ...previous, stats: update };
+    renderDestinationStats(update.platform);
+    return;
+  }
   state.streamStatuses[update.platform] = update;
   updateCredentialStatus(state.credentialStatus);
   if (update.status === 'error') showToast(`${PLATFORM_DETAILS[update.platform].name} : ${update.message}`, 'warning');
@@ -1356,7 +1408,82 @@ function openGuide() {
           'Windows peut avertir au téléchargement : l’installateur n’est pas encore signé. « Informations complémentaires » puis « Exécuter quand même ».',
         ],
       },
+      {
+        title: '8 · Vérifier le débit, signaler un problème',
+        items: [
+          '« Tester mon débit montant », sous les préréglages, envoie quelques mégaoctets à un service de mesure public et compare le résultat au préréglage choisi. Aucune clé, aucune image.',
+          'Pendant le direct, chaque carte affiche le débit réel, les images par seconde et les images perdues : c’est la preuve que l’encodeur produit un flux stable.',
+          'Un problème ? « Signaler un problème » écrit un rapport sur ton Bureau, clés masquées, et ouvre une issue GitHub préremplie. Rien ne part sans ton clic.',
+        ],
+      },
     ],
+  });
+}
+
+function openBugReport() {
+  const explanation = {
+    title: 'Signaler un problème',
+    eyebrow: 'RAPPORT LOCAL',
+    mark: '!',
+    action: 'Fermer',
+    body: 'Décris ce qui ne va pas en quelques mots. Le rapport contient la version, ton système, l’encodeur et les dernières lignes de FFmpeg ; les clés de diffusion y sont masquées.',
+    items: [
+      'Le fichier est écrit sur ton Bureau : relis-le avant de l’envoyer.',
+      'Le bouton GitHub ouvre une issue préremplie : joins-y le fichier.',
+      'Rien ne part sans ton clic, et aucun serveur Camton Live ne reçoit le rapport.',
+    ],
+  };
+  if (!desktop?.isDesktopApp) {
+    showModal({ ...explanation, items: ['Cette fonction passe par l’application Windows : l’aperçu web n’a pas accès aux journaux de l’encodeur.'] });
+    return;
+  }
+  showModal(explanation);
+  const copy = $('#modalCopy');
+  const form = document.createElement('form');
+  form.className = 'credential-form';
+  form.autocomplete = 'off';
+  const field = document.createElement('label');
+  field.className = 'credential-field';
+  const fieldLabel = document.createElement('span');
+  fieldLabel.textContent = 'Ce qui ne va pas';
+  const area = document.createElement('textarea');
+  area.rows = 4;
+  area.maxLength = 2000;
+  area.placeholder = 'La sortie Twitch s’arrête au bout de deux minutes…';
+  field.append(fieldLabel, area);
+  const message = document.createElement('p');
+  message.className = 'credential-message';
+  message.setAttribute('aria-live', 'polite');
+  const actions = document.createElement('div');
+  actions.className = 'credential-actions';
+  const save = document.createElement('button');
+  save.type = 'submit';
+  save.className = 'button button-primary';
+  save.textContent = 'Créer le rapport et ouvrir GitHub';
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'button button-secondary';
+  cancel.textContent = 'Annuler';
+  cancel.addEventListener('click', closeModal);
+  actions.append(save, cancel);
+  $('#modalOk').classList.add('hidden');
+  form.append(field, message, actions);
+  copy.append(form);
+  state.modalCleanup = () => { area.value = ''; };
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    save.disabled = true;
+    message.textContent = 'Écriture du rapport…';
+    try {
+      const { path } = await desktop.saveBugReport({ description: area.value });
+      message.textContent = `Rapport écrit : ${path}. La page GitHub s’ouvre : joins-y ce fichier.`;
+      await desktop.openBugIssue({ description: area.value });
+      showToast('Rapport prêt sur le Bureau. Joins-le à l’issue GitHub.');
+    } catch (error) {
+      message.textContent = error?.message || 'Le rapport n’a pas pu être écrit.';
+    } finally {
+      save.disabled = false;
+    }
   });
 }
 
@@ -1370,6 +1497,8 @@ function openFaq() {
       { title: 'Où trouver l’adresse et la clé YouTube ?', text: 'YouTube Studio → Créer → Passer au direct → Gérer → Programmer un direct, puis « Diffusion personnalisée » dans les paramètres du flux. L’adresse commence par rtmps:// et la clé fait une trentaine de caractères.' },
       { title: 'Et TikTok ?', text: 'La destination est disponible depuis le 2 décembre 2026. Il faut l’adresse du serveur et la clé de flux fournies par l’application TikTok, et cette clé change à chaque direct. L’accès au direct dépend de ton compte et de ton pays : sans l’option de clé de flux, un service de relais reste la solution.' },
       { title: 'TikTok ne me donne pas de clé, un relais aide-t-il ?', text: 'Oui pour le cas de la clé : le relais fournit sa propre adresse et sa propre clé, et c’est lui qui pousse vers TikTok. Non pour l’éligibilité : si TikTok refuse le direct à ton compte, le relais échouera aussi. Dans les deux cas, la carte Relais accepte aussi un serveur RTMP personnel.' },
+      { title: 'Comment savoir si mon direct part vraiment ?', text: 'Chaque carte de destination affiche, pendant le direct, le débit réellement encodé, les images par seconde et les images perdues. C’est une mesure locale : elle prouve que l’encodeur produit un flux stable, pas que la plateforme l’accepte. La réception se vérifie dans l’outil de la plateforme.' },
+      { title: 'Comment signaler un bug ?', text: 'Le lien « Signaler un problème » de la barre latérale écrit un rapport sur ton Bureau et ouvre une issue GitHub préremplie. Le rapport contient la version, ton système, l’encodeur et les dernières lignes de FFmpeg ; les clés y sont masquées. Rien ne part sans ton clic.' },
       { title: 'Mes clés partent-elles sur un serveur ?', text: 'Non. Elles sont chiffrées sur ton PC avec le stockage sécurisé de Windows et ne sont jamais réaffichées. Pendant un direct, l’adresse complète est passée à FFmpeg : elle peut donc apparaître dans un outil local d’inspection des processus.' },
       { title: 'Puis-je diffuser sur plusieurs plateformes en même temps ?', text: 'Oui. Camton Live lance un encodage par destination. Deux plateformes, c’est deux fois le débit montant : vérifie ta connexion avant de cocher la deuxième.' },
       { title: 'Quel réglage de qualité choisir ?', text: 'Fluide pour une connexion modeste (720p, 3 Mb/s), Équilibré par défaut (720p, 4,5 Mb/s), Très net pour un PC solide et une bonne fibre (1080p, 6 Mb/s). Le débit annoncé est par destination.' },
@@ -1575,6 +1704,8 @@ function init() {
   $('#helpBtn').addEventListener('click', openGuide);
   $('#faqBtn').addEventListener('click', openFaq);
   $('#helpTopBtn').addEventListener('click', openGuide);
+  $('#speedTestBtn').addEventListener('click', runSpeedTest);
+  $('#reportBugBtn').addEventListener('click', openBugReport);
   $('#dismissBanner').addEventListener('click', () => $('#demoBanner').remove());
   $('#privacyBtn').addEventListener('click', () => showModal({
     title: 'Ta vidéo reste chez toi avant l’envoi', eyebrow: 'CONFIDENTIALITÉ',

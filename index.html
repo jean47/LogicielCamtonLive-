@@ -31,6 +31,7 @@
           <p><strong>Besoin d’un coup de main&nbsp;?</strong><br />Chaque étape est expliquée, sans jargon.</p>
           <button class="link-button" id="helpBtn" type="button">Voir le guide <span aria-hidden="true">↗</span></button>
           <button class="link-button" id="faqBtn" type="button">Questions fréquentes <span aria-hidden="true">↗</span></button>
+          <button class="link-button" id="reportBugBtn" type="button">Signaler un problème <span aria-hidden="true">↗</span></button>
         </div>
         <p class="sidebar-foot"><span class="status-dot ready" aria-hidden="true"></span> Clés chiffrées sur cet appareil</p>
       </aside>
@@ -244,6 +245,7 @@
                 </header>
                 <h3>YouTube</h3>
                 <p>Envoie le flux au point d’ingestion fourni dans YouTube Studio.</p>
+                <small class="platform-stats" id="youtubeStats" aria-live="off"></small>
                 <label class="platform-select"><input type="checkbox" data-platform="youtube" /><span class="custom-check" aria-hidden="true"></span><span>Ajouter à mon live</span></label>
                 <button class="platform-info" data-platform-info="youtube" type="button">Configurer YouTube <span aria-hidden="true">↗</span></button>
               </article>
@@ -255,6 +257,7 @@
                 </header>
                 <h3>Twitch</h3>
                 <p>Envoie le flux à Twitch avec ta clé personnelle.</p>
+                <small class="platform-stats" id="twitchStats" aria-live="off"></small>
                 <label class="platform-select"><input type="checkbox" data-platform="twitch" /><span class="custom-check" aria-hidden="true"></span><span>Ajouter à mon live</span></label>
                 <button class="platform-info" data-platform-info="twitch" type="button">Configurer Twitch <span aria-hidden="true">↗</span></button>
               </article>
@@ -266,6 +269,7 @@
                 </header>
                 <h3>TikTok</h3>
                 <p>Diffuse ton direct TikTok avec l’adresse du serveur et la clé de flux fournies par l’application TikTok.</p>
+                <small class="platform-stats" id="tiktokStats" aria-live="off"></small>
                 <label class="platform-select"><input type="checkbox" data-platform="tiktok" /><span class="custom-check" aria-hidden="true"></span><span>Ajouter à mon live</span></label>
                 <button class="platform-info" data-platform-info="tiktok" type="button">Configurer TikTok <span aria-hidden="true">↗</span></button>
               </article>
@@ -277,6 +281,7 @@
                 </header>
                 <h3>Relais</h3>
                 <p>Envoie un seul flux à un relais (Restream, Streamlabs) qui le répartit vers TikTok, YouTube ou Twitch.</p>
+                <small class="platform-stats" id="relayStats" aria-live="off"></small>
                 <label class="platform-select"><input type="checkbox" data-platform="relay" /><span class="custom-check" aria-hidden="true"></span><span>Ajouter à mon live</span></label>
                 <button class="platform-info" data-platform-info="relay" type="button">Configurer un relais <span aria-hidden="true">↗</span></button>
               </article>
@@ -305,6 +310,10 @@
                 <label class="quality-option"><input type="radio" name="quality" value="smooth" /><span class="radio-dot" aria-hidden="true"></span><span class="quality-copy"><strong>Fluide</strong><small>720p · 30 i/s · ~3 Mb/s</small></span><span class="quality-tag">Connexion modeste</span></label>
                 <label class="quality-option selected"><input type="radio" name="quality" value="balanced" checked /><span class="radio-dot" aria-hidden="true"></span><span class="quality-copy"><strong>Équilibré</strong><small>720p · 60 i/s · ~4,5 Mb/s</small></span><span class="quality-tag quality-tag--recommended">Conseillé</span></label>
                 <label class="quality-option"><input type="radio" name="quality" value="sharp" /><span class="radio-dot" aria-hidden="true"></span><span class="quality-copy"><strong>Très net</strong><small>1080p · 60 i/s · ~6 Mb/s</small></span><span class="quality-tag">PC solide</span></label>
+              </div>
+              <div class="speed-test">
+                <button class="button button-secondary" id="speedTestBtn" type="button"><span aria-hidden="true">⇅</span> Tester mon débit montant</button>
+                <span class="speed-test-result" id="speedTestResult" aria-live="polite">Mesure l’envoi réel avant de démarrer.</span>
               </div>
             </div>
           </section>

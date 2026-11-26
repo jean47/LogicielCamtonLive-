@@ -5,7 +5,8 @@ const fsp = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const {
-  createStreamEngine, PROFILES, destinationFor, buildFfmpegArgs, safeFailureMessage,
+  createStreamEngine, PROFILES, MAX_DESTINATIONS, destinationFor, buildFfmpegArgs, buildStats,
+  safeFailureMessage,
 } = require('./stream-engine.cjs');
 
 const CREDENTIALS = Object.freeze({
@@ -20,7 +21,7 @@ const ENCODERS = `Encoders:
  V....D h264_mf              H264 via MediaFoundation (codec h264)
  A....D aac                  AAC (Advanced Audio Coding)`;
 
-function ffmpegStub({ encoders = ENCODERS, fail = '', failProbe = [] } = {}) {
+function ffmpegStub({ encoders = ENCODERS, fail = '', failProbe = [], progress = '' } = {}) {
   const probe = `if [ "$1" = "-hide_banner" ] && [ "$2" = "-encoders" ]; then
   cat <<'LIST'
 ${encoders}
@@ -35,10 +36,12 @@ fi`;
     done ;;
 esac`
     : '';
+  const progressBlock = progress ? `printf '%s' '${progress}'` : '';
   const body = fail
     ? `printf '%s\\n' "${fail}" >&2
 exit 1`
     : `printf 'frame=1\\n'
+${progressBlock}
 cat > /dev/null
 printf 'frame=2\\n'
 exit 0`;
@@ -163,6 +166,61 @@ test('encoder failures are translated into messages without leaking the key', ()
   assert.match(safeFailureMessage('Conversion failed!'), /L’encodeur a arrêté/);
 });
 
+test('progress fields become readable statistics', () => {
+  const stats = buildStats({
+    fps: '59.94',
+    bitrate: '4521.3kbits/s',
+    speed: '1.02x',
+    drop_frames: '3',
+    total_size: '2097152',
+  });
+  assert.deepEqual(stats, { fps: 60, bitrateKbps: 4521, speed: 1.02, droppedFrames: 3, totalBytes: 2097152 });
+  assert.deepEqual(buildStats({}), { fps: 0, bitrateKbps: 0, speed: 0, droppedFrames: 0, totalBytes: 0 });
+});
+
+test('the encoder reports real throughput while the stream is running', async (t) => {
+  const progress = [
+    'frame=42',
+    'fps=59.94',
+    'bitrate=4512.7kbits/s',
+    'total_size=3145728',
+    'drop_frames=0',
+    'speed=1.01x',
+    'progress=continue',
+    '',
+  ].join('\n');
+  const { engine, events } = harness(t, { progress });
+  await engine.start({ platforms: ['twitch'], profileName: 'balanced', credentials: CREDENTIALS });
+  const stats = await waitFor(events, (event) => event.type === 'stats');
+  assert.equal(stats.platform, 'twitch');
+  assert.equal(stats.bitrateKbps, 4513);
+  assert.equal(stats.fps, 60);
+  assert.equal(stats.droppedFrames, 0);
+  assert.equal(stats.speed, 1.01);
+});
+
+test('four destinations are accepted and a fifth is refused', async (t) => {
+  const { engine } = harness(t);
+  assert.equal(MAX_DESTINATIONS, 4);
+  const credentials = {
+    twitch: { key: 'live_1234567890_abcdef' },
+    youtube: { endpoint: 'rtmps://a.rtmps.youtube.com:443/live2', key: 'abcd-efgh-ijkl-mnop' },
+    tiktok: { endpoint: 'rtmps://ingest.tiktok.example:443/app', key: 'tiktok-key-1234' },
+    relay: { endpoint: 'rtmps://live.restream.io:443/live', key: 'relay-key-1234' },
+  };
+  const started = await engine.start({
+    platforms: ['twitch', 'youtube', 'tiktok', 'relay'],
+    profileName: 'smooth',
+    credentials,
+  });
+  assert.equal(started.platforms.length, 4);
+  await engine.stop();
+  await assert.rejects(
+    engine.start({ platforms: ['twitch', 'youtube', 'tiktok', 'relay', 'twitch'], profileName: 'smooth', credentials }),
+    /entre une et 4 destinations/,
+  );
+});
+
 test('a session starts one encoder per destination, accepts chunks and stops cleanly', async (t) => {
   const { engine, events } = harness(t);
   const started = await engine.start({ platforms: ['twitch', 'youtube'], profileName: 'smooth', credentials: CREDENTIALS });
@@ -209,7 +267,7 @@ test('duplicate, unknown, empty and concurrent sessions are refused', async (t) 
   const { engine } = harness(t);
   await assert.rejects(engine.start({ platforms: ['twitch', 'twitch'], profileName: 'balanced', credentials: CREDENTIALS }), /deux fois/);
   await assert.rejects(engine.start({ platforms: ['kick'], profileName: 'balanced', credentials: CREDENTIALS }), /non prise en charge/);
-  await assert.rejects(engine.start({ platforms: [], profileName: 'balanced', credentials: CREDENTIALS }), /une ou deux destinations/);
+  await assert.rejects(engine.start({ platforms: [], profileName: 'balanced', credentials: CREDENTIALS }), /entre une et 4 destinations/);
   await assert.rejects(engine.start({ platforms: ['twitch'], profileName: 'ultra', credentials: CREDENTIALS }), /Préréglage vidéo inconnu/);
 
   await engine.start({ platforms: ['twitch'], profileName: 'balanced', credentials: CREDENTIALS });

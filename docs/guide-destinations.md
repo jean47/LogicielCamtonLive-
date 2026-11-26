@@ -91,6 +91,7 @@ La carte **Relais** accepte l'adresse et la clé de n'importe quel serveur RTMP(
 ## Vérifier que ça part
 
 - Le statut « Encodage actif » signifie que l'encodeur tourne sur ton PC. Il ne garantit pas la réception.
+- Pendant le direct, chaque carte affiche le débit réellement encodé, les images par seconde et les images perdues. Un débit qui s'écroule ou des images perdues qui grimpent annoncent une connexion trop juste, avant même que la plateforme ne se plaigne.
 - Vérifie la réception côté plateforme : tableau de bord Twitch, état du direct dans YouTube Studio, ou aperçu du direct dans l'application TikTok.
 - En cas d'échec, Camton Live écrit un rapport sur le Bureau : encodeur utilisé, code de sortie et dernières lignes FFmpeg.
 - Message « clé refusée » : la clé est fausse, réinitialisée ou l'événement n'est pas prêt. Message « connexion impossible » : réseau, pare-feu ou adresse de serveur.
@@ -105,4 +106,26 @@ Chaque destination sélectionnée a son propre encodage et consomme son propre d
 | Équilibré | 720p · 60 i/s | ~4,5 Mb/s |
 | Très net | 1080p · 60 i/s | ~6 Mb/s |
 
-Deux plateformes en « Équilibré », c'est environ 9 Mb/s montants, plus la marge réseau. Teste ta connexion avant de cocher une deuxième destination.
+Deux plateformes en « Équilibré », c'est environ 9 Mb/s montants, plus la marge réseau.
+
+### Mesurer son débit montant
+
+Le bouton **Tester mon débit montant**, sous les préréglages, envoie quelques mégaoctets à un service de mesure public (Cloudflare) et compare le résultat au préréglage choisi. Trois réponses possibles : ça passe avec de la marge, c'est juste, ou c'est insuffisant.
+
+- Aucune clé, aucun nom de fichier et aucune image ne partent : seuls des octets neutres sont envoyés, et rien n'est conservé.
+- La mesure se fait dans l'application Windows. L'aperçu web ne peut pas envoyer de données.
+- Une mesure ponctuelle ne dit rien des variations du soir : refais-la à l'heure de ton direct.
+
+### Jusqu'à quatre destinations
+
+Camton Live accepte maintenant quatre destinations simultanées. Chacune a son encodeur et son débit. Au-delà de deux, un relais coûte moins cher en bande montante : tu envoies un seul flux, il le répartit.
+
+## Signaler un problème
+
+Le lien **Signaler un problème**, dans la barre latérale, prépare un rapport local :
+
+1. Tu décris ce qui ne va pas, en quelques mots.
+2. Camton Live écrit un fichier sur ton Bureau : version, système, encodeur, sorties actives et dernières lignes de FFmpeg.
+3. Une page GitHub s'ouvre avec un message prérempli : joins-y le fichier.
+
+Les clés de diffusion sont masquées dans le rapport (`rtmps://…/<clé masquée>`), y compris quand elles apparaissent dans les lignes de l'encodeur. Rien n'est envoyé automatiquement : le fichier reste sur ton Bureau jusqu'à ce que tu l'envoies toi-même.

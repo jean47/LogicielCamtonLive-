@@ -25,12 +25,16 @@ npm run desktop:win    # ffmpeg:fetch + build + electron-builder (ZIP portable)
 - `electron/stream-engine.cjs` — un processus FFmpeg par destination, rétropression, états par sortie.
 - `electron/display-capture.cjs` — `setDisplayMediaRequestHandler` et revalidation de la source.
 - `electron/update-service.cjs` — manifeste HTTPS, vérification SHA-256, installation différée pendant un direct.
+- `electron/speed-test.cjs` — mesure du débit montant par envoi POST vers Cloudflare (`fetch` injectable) ; le verdict textuel vit côté interface dans `src/speed-verdict.js`.
+- `electron/bug-report.cjs` — rapport local sur le Bureau + issue GitHub préremplie ; `redactIngestUrls` masque la clé dans le dernier segment de toute adresse RTMP(S).
 
 ## Conventions
 
 - Textes d’interface en français, ton direct, pas de promesse de « live confirmé » : on parle d’encodage local.
 - Les classes d’état basculées par le JS sont `active`, `selected`, `hidden`, `show`, `open`, `visible`, `on`, `done` — ne pas les renommer sans toucher `src/main.js`.
 - Les identifiants (`#startLiveBtn`, `#micLevel`, …) sont le contrat entre le HTML et le renderer.
+- `stream-engine.cjs` émet `{ type: 'stats', … }` une fois par seconde à partir de `-progress pipe:1` (débit, fps, images perdues) ; le renderer ne rafraîchit que la ligne de statistiques, pas le badge.
+- `MAX_DESTINATIONS` vaut 4 dans `stream-engine.cjs` : les tests couvrent l'acceptation de quatre sorties et le refus de la cinquième.
 - `stream-engine.cjs` accepte un objet `deps` (`spawn`, `platform`, `arch`, `resolveExecutable`) uniquement pour les tests : la production garde les valeurs par défaut.
 
 ## Pièges connus

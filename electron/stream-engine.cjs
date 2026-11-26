@@ -2,6 +2,8 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 
+const MAX_DESTINATIONS = 4;
+
 const PROFILES = Object.freeze({
   smooth: { width: 1280, height: 720, fps: 30, bitrate: 3000 },
   balanced: { width: 1280, height: 720, fps: 60, bitrate: 4500 },
@@ -133,6 +135,24 @@ function destinationFor(platform, credentials) {
   throw new Error('Les paramètres de diffusion de cette destination sont incomplets.');
 }
 
+// `-progress pipe:1` envoie un bloc de champs par seconde. Seul `frame=` était lu
+// jusqu'ici ; le reste donne le débit réel, la vitesse d'encodage et les images
+// perdues, c'est-à-dire la seule indication honnête que le flux avance.
+function buildStats(fields) {
+  const fps = Number.parseFloat(fields.fps);
+  const bitrate = Number.parseFloat(fields.bitrate);
+  const speed = Number.parseFloat(fields.speed);
+  const dropped = Number.parseInt(fields.drop_frames, 10);
+  const bytes = Number.parseInt(fields.total_size, 10);
+  return {
+    fps: Number.isFinite(fps) ? Math.round(fps) : 0,
+    bitrateKbps: Number.isFinite(bitrate) ? Math.round(bitrate) : 0,
+    speed: Number.isFinite(speed) ? Math.round(speed * 100) / 100 : 0,
+    droppedFrames: Number.isFinite(dropped) ? dropped : 0,
+    totalBytes: Number.isFinite(bytes) ? bytes : 0,
+  };
+}
+
 function safeFailureMessage(text) {
   if (/401|403|unauthori[sz]ed|forbidden|invalid.*key|publish.*denied|authentication|access denied/i.test(text)) {
     return 'La plateforme a refusé la clé ou la destination. Vérifie les paramètres dans Twitch, YouTube Studio, l’application TikTok ou ton relais.';
@@ -200,14 +220,22 @@ function createStreamEngine({ app, emit, deps = {} }) {
 
   function watchOutput(platform, child, entry) {
     let progressPending = '';
+    const fields = {};
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (chunk) => {
       progressPending += chunk;
       const lines = progressPending.split(/\r\n|\n|\r/);
       progressPending = lines.pop() || '';
       for (const line of lines) {
-        const frame = line.match(/^frame=(\d+)/);
-        if (frame && Number(frame[1]) > 0 && !entry.sawFrame) {
+        const parsed = line.match(/^([a-z_]+)=(.*)$/);
+        if (!parsed) continue;
+        const [, key, raw] = parsed;
+        if (key === 'progress') {
+          if (!stopping && entry.sawFrame) emit({ type: 'stats', platform, ...buildStats(fields) });
+          continue;
+        }
+        fields[key] = raw;
+        if (key === 'frame' && Number(raw) > 0 && !entry.sawFrame) {
           entry.sawFrame = true;
           if (!stopping) {
             const label = sessionEncoder ? ` (${sessionEncoder.label})` : '';
@@ -311,8 +339,8 @@ function createStreamEngine({ app, emit, deps = {} }) {
     if (children.size) throw new Error('Une session de diffusion est déjà en cours.');
     const profile = PROFILES[profileName];
     if (!profile) throw new Error('Préréglage vidéo inconnu.');
-    if (!Array.isArray(platforms) || platforms.length < 1 || platforms.length > 2) {
-      throw new Error('Sélectionne une ou deux destinations.');
+    if (!Array.isArray(platforms) || platforms.length < 1 || platforms.length > MAX_DESTINATIONS) {
+      throw new Error(`Sélectionne entre une et ${MAX_DESTINATIONS} destinations.`);
     }
 
     // Validate every destination before spawning so a partial start never leaves an orphan encoder.
@@ -399,5 +427,6 @@ function createStreamEngine({ app, emit, deps = {} }) {
 }
 
 module.exports = {
-  createStreamEngine, PROFILES, VIDEO_ENCODERS, destinationFor, buildFfmpegArgs, safeFailureMessage,
+  createStreamEngine, PROFILES, VIDEO_ENCODERS, MAX_DESTINATIONS, destinationFor, buildFfmpegArgs,
+  buildStats, safeFailureMessage,
 };

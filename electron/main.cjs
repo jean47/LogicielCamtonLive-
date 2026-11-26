@@ -5,6 +5,8 @@ const { createStreamEngine } = require('./stream-engine.cjs');
 const { createUpdateService } = require('./update-service.cjs');
 const { createDisplayCaptureService } = require('./display-capture.cjs');
 const { createRecorder } = require('./recorder.cjs');
+const { createBugReporter } = require('./bug-report.cjs');
+const { measureUpload } = require('./speed-test.cjs');
 
 const APP_ID = 'fr.camtonlive.desktop';
 const isDevelopment = !app.isPackaged;
@@ -15,6 +17,7 @@ let streamEngine;
 let updateService;
 let displayCapture;
 let recorder;
+let bugReporter;
 
 function isTrustedUrl(url) {
   return isDevelopment
@@ -118,6 +121,26 @@ handleTrusted('record:reveal', (_event, filePath) => {
   return true;
 });
 handleTrusted('record:directory', () => recorder.directory());
+handleTrusted('speed:measure', () => measureUpload());
+handleTrusted('report:save', async (_event, input) => {
+  const diagnostics = streamEngine.getDiagnostics();
+  const outputs = Array.isArray(diagnostics.outputs) ? diagnostics.outputs : [];
+  const stderr = outputs.flatMap((output) => output.stderr || []);
+  if (Array.isArray(diagnostics.lastSession?.stderr)) stderr.push(...diagnostics.lastSession.stderr);
+  return bugReporter.save({
+    version: app.getVersion(),
+    platform: process.platform,
+    arch: process.arch,
+    encoder: diagnostics.encoder ? `${diagnostics.encoder.name} (${diagnostics.encoder.label})` : 'inconnu',
+    activeOutputs: outputs.map((output) => output.platform).join(', ') || 'aucune',
+    description: input?.description,
+    stderr,
+  });
+});
+handleTrusted('report:open-issue', (_event, input) => bugReporter.openIssue({
+  version: app.getVersion(),
+  description: input?.description,
+}));
 handleTrusted('updates:get-state', () => updateService.getState());
 handleTrusted('updates:download', () => updateService.download());
 handleTrusted('updates:install', () => updateService.install());
@@ -131,6 +154,7 @@ app.whenReady().then(() => {
     getIsStreaming: () => streamEngine?.isActive() || false,
   });
   recorder = createRecorder({ app, emit: emitRecordingState });
+  bugReporter = createBugReporter({ app, openExternal: (url) => shell.openExternal(url) });
   displayCapture = createDisplayCaptureService({
     desktopCapturer,
     session: session.defaultSession,

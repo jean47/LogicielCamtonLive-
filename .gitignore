@@ -6,3 +6,4 @@ release/
 vendor/ffmpeg/win-x64/
 dist-update/
 updates/
+captures-camton-live.zip
