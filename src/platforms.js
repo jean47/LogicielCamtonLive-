@@ -15,6 +15,11 @@ export const PLATFORM_DETAILS = Object.freeze({
     title: 'Configurer Twitch',
     instruction: 'Dans ton tableau de bord créateur Twitch, ouvre les paramètres de diffusion et copie ta clé de stream. Ne saisis jamais ton mot de passe Twitch dans Camton Live.',
   }),
+  tiktok: Object.freeze({
+    name: 'TikTok',
+    title: 'Configurer TikTok',
+    instruction: 'Dans l’application TikTok, ouvre « Direct », puis choisis la diffusion par clé de flux et copie l’adresse du serveur et la clé. Cette clé change à chaque direct : recopie-la juste avant de démarrer. L’accès au direct dépend de ton compte et de ton pays.',
+  }),
 });
 
-export const PLATFORM_IDS = Object.freeze(['twitch', 'youtube']);
+export const PLATFORM_IDS = Object.freeze(['twitch', 'youtube', 'tiktok']);

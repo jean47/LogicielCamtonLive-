@@ -138,6 +138,14 @@ test('destinations are built from the encrypted credentials only', () => {
   assert.throws(() => destinationFor('youtube', { youtube: { endpoint: 'rtmps://a.rtmps.youtube.com:443/live2' } }), /incomplets/);
 });
 
+test('a tiktok destination joins the ingest address and the session key', () => {
+  assert.equal(
+    destinationFor('tiktok', { tiktok: { endpoint: 'rtmps://push-rtmp-l6.example.tiktokcdn.com:443/stream/', key: ' cle ' } }),
+    'rtmps://push-rtmp-l6.example.tiktokcdn.com:443/stream/cle',
+  );
+  assert.throws(() => destinationFor('tiktok', { tiktok: { key: 'cle' } }), /incomplets/);
+});
+
 test('encoder failures are translated into messages without leaking the key', () => {
   const key = CREDENTIALS.twitch.key;
   const unauthorized = safeFailureMessage(`HTTP error 401 Unauthorized for rtmps://live.twitch.tv:443/app/${key}`);
@@ -192,7 +200,7 @@ test('a destination without credentials aborts before any encoder is spawned', a
 test('duplicate, unknown, empty and concurrent sessions are refused', async (t) => {
   const { engine } = harness(t);
   await assert.rejects(engine.start({ platforms: ['twitch', 'twitch'], profileName: 'balanced', credentials: CREDENTIALS }), /deux fois/);
-  await assert.rejects(engine.start({ platforms: ['tiktok'], profileName: 'balanced', credentials: CREDENTIALS }), /non prise en charge/);
+  await assert.rejects(engine.start({ platforms: ['kick'], profileName: 'balanced', credentials: CREDENTIALS }), /non prise en charge/);
   await assert.rejects(engine.start({ platforms: [], profileName: 'balanced', credentials: CREDENTIALS }), /Sélectionne Twitch/);
   await assert.rejects(engine.start({ platforms: ['twitch'], profileName: 'ultra', credentials: CREDENTIALS }), /Préréglage vidéo inconnu/);
 

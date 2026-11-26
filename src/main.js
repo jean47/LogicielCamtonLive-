@@ -27,7 +27,7 @@ const state = {
   demoRunning: false,
   selectedPlatforms: new Set(storedPlatforms),
   quality: localStorage.getItem('lumacast-quality') || localStorage.getItem('sf-quality') || 'balanced',
-  credentialStatus: { available: false, twitch: false, youtube: false },
+  credentialStatus: { available: false, twitch: false, youtube: false, tiktok: false },
   streamStatuses: {},
   isStreaming: false,
   isStarting: false,
@@ -520,7 +520,7 @@ function toggleSourceTab(tab) {
 }
 
 function updateCredentialStatus(status) {
-  state.credentialStatus = status || { available: false, twitch: false, youtube: false };
+  state.credentialStatus = status || { available: false, twitch: false, youtube: false, tiktok: false };
   for (const platform of PLATFORM_IDS) {
     const badge = $(`#${platform}Badge`);
     const configured = Boolean(state.credentialStatus[platform]);
@@ -569,7 +569,7 @@ function updatePlatformSelection({ persist = true } = {}) {
     ? `${selected.length} destination${selected.length > 1 ? 's' : ''} sélectionnée${selected.length > 1 ? 's' : ''}. Vérifie la source, le microphone et le débit montant avant l’envoi.`
     : configuredCount
       ? 'Choisis les destinations configurées à utiliser pour ce direct.'
-      : 'Configure d’abord une clé Twitch ou les paramètres d’ingestion YouTube.';
+      : 'Configure d’abord une destination : Twitch, YouTube ou TikTok.';
   updateBitrateNotice();
 }
 
@@ -637,7 +637,8 @@ async function openCredentialModal(platform) {
 
   $('#modalTitle').textContent = details.title;
   $('#modalEyebrow').textContent = 'CLÉ CHIFFRÉE SUR CET APPAREIL';
-  $('#modalMark').textContent = platform === 'twitch' ? '▰' : '▶';
+  const platformMarks = { twitch: '▰', youtube: '▶', tiktok: '♪' };
+  $('#modalMark').textContent = platformMarks[platform] || '▶';
   $('#modalOk').classList.add('hidden');
   const copy = $('#modalCopy');
   copy.replaceChildren();
@@ -653,9 +654,12 @@ async function openCredentialModal(platform) {
   form.className = 'credential-form';
   form.autocomplete = 'off';
   let endpointInput = null;
-  if (platform === 'youtube') {
-    endpointInput = addFormField(form, 'Adresse du serveur d’ingestion YouTube', {
-      type: 'url', placeholder: 'rtmps://a.rtmps.youtube.com:443/live2', autocomplete: 'url', inputMode: 'url',
+  if (platform !== 'twitch') {
+    const endpointField = platform === 'youtube'
+      ? { label: 'Adresse du serveur d’ingestion YouTube', placeholder: 'rtmps://a.rtmps.youtube.com:443/live2' }
+      : { label: 'Adresse du serveur TikTok', placeholder: 'rtmps://…:443/app' };
+    endpointInput = addFormField(form, endpointField.label, {
+      type: 'url', placeholder: endpointField.placeholder, autocomplete: 'url', inputMode: 'url',
     });
   }
   const keyInput = addFormField(form, `Clé de diffusion ${details.name}`, {
@@ -1150,7 +1154,7 @@ async function startLive() {
     return;
   }
   if (!state.selectedPlatforms.size) {
-    showModal({ title: 'Choisis une destination', eyebrow: 'ÉTAPE 3', body: 'Configure d’abord une clé Twitch ou les paramètres d’ingestion YouTube, puis sélectionne cette destination.', mark: '!' });
+    showModal({ title: 'Choisis une destination', eyebrow: 'ÉTAPE 3', body: 'Configure d’abord Twitch, YouTube ou TikTok, puis sélectionne cette destination.', mark: '!' });
     scrollToSection('platforms');
     return;
   }
@@ -1324,11 +1328,12 @@ function openGuide() {
         ],
       },
       {
-        title: '5 · TikTok : à partir du 2 décembre 2026',
+        title: '5 · TikTok : où trouver l’adresse et la clé',
         items: [
-          'La destination sera activée dans Camton Live le 2 décembre 2026 ; la marche à suivre détaillée sera publiée ce jour-là.',
-          'Elle utilisera l’adresse du serveur et la clé de flux fournies par l’application TikTok, comme pour YouTube.',
-          'La clé TikTok est liée à un direct : elle se recopie avant chaque session.',
+          'Dans l’application TikTok, ouvre « Direct » puis l’option de diffusion par clé de flux. Le libellé dépend du compte et du pays.',
+          'Copie l’adresse du serveur (elle commence par rtmps://) et la clé de flux, puis colle-les dans la carte TikTok.',
+          'La clé est liée à un seul direct : recopie-la avant chaque session. Une clé expirée est refusée.',
+          'Sans option « clé de flux », ton compte n’a pas l’accès : un service de relais (Restream, Streamlabs) peut faire l’intermédiaire.',
         ],
       },
       {
@@ -1352,7 +1357,7 @@ function openFaq() {
       { title: 'Camton Live diffuse-t-il vraiment en direct ?', text: 'Oui : l’application encode sur ton PC et envoie le flux à la plateforme configurée. Elle ne peut pas garantir la réception, car c’est la plateforme qui accepte ou refuse le flux. Vérifie l’état du direct dans Twitch ou dans YouTube Studio.' },
       { title: 'Où trouver ma clé Twitch ?', text: 'Tableau de bord créateur → Paramètres → Diffusion → Clé de flux primaire, puis « Afficher » et copie.' },
       { title: 'Où trouver l’adresse et la clé YouTube ?', text: 'YouTube Studio → Créer → Passer au direct → Gérer → Programmer un direct, puis « Diffusion personnalisée » dans les paramètres du flux. L’adresse commence par rtmps:// et la clé fait une trentaine de caractères.' },
-      { title: 'Et TikTok ?', text: 'La destination arrive le 2 décembre 2026. Il faudra l’adresse du serveur et la clé de flux fournies par l’application TikTok, et cette clé change à chaque direct. L’accès au direct dépend de ton compte et de ton pays.' },
+      { title: 'Et TikTok ?', text: 'La destination est disponible depuis le 2 décembre 2026. Il faut l’adresse du serveur et la clé de flux fournies par l’application TikTok, et cette clé change à chaque direct. L’accès au direct dépend de ton compte et de ton pays : sans l’option de clé de flux, un service de relais reste la solution.' },
       { title: 'Mes clés partent-elles sur un serveur ?', text: 'Non. Elles sont chiffrées sur ton PC avec le stockage sécurisé de Windows et ne sont jamais réaffichées. Pendant un direct, l’adresse complète est passée à FFmpeg : elle peut donc apparaître dans un outil local d’inspection des processus.' },
       { title: 'Puis-je diffuser sur plusieurs plateformes en même temps ?', text: 'Oui. Camton Live lance un encodage par destination. Deux plateformes, c’est deux fois le débit montant : vérifie ta connexion avant de cocher la deuxième.' },
       { title: 'Quel réglage de qualité choisir ?', text: 'Fluide pour une connexion modeste (720p, 3 Mb/s), Équilibré par défaut (720p, 4,5 Mb/s), Très net pour un PC solide et une bonne fibre (1080p, 6 Mb/s). Le débit annoncé est par destination.' },
@@ -1420,13 +1425,13 @@ async function startDesktopCapture(source) {
 
 async function refreshCredentialStatus() {
   if (!desktop?.isDesktopApp) {
-    updateCredentialStatus({ available: false, twitch: false, youtube: false });
+    updateCredentialStatus({ available: false, twitch: false, youtube: false, tiktok: false });
     return;
   }
   try {
     updateCredentialStatus(await desktop.getCredentialStatus());
   } catch {
-    updateCredentialStatus({ available: false, twitch: false, youtube: false });
+    updateCredentialStatus({ available: false, twitch: false, youtube: false, tiktok: false });
   }
 }
 

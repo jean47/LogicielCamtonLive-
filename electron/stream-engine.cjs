@@ -125,12 +125,17 @@ function destinationFor(platform, credentials) {
     const key = String(credentials?.youtube?.key || '').trim();
     if (endpoint && key) return `${endpoint}/${key}`;
   }
+  if (platform === 'tiktok') {
+    const endpoint = normalizeEndpoint(credentials?.tiktok?.endpoint);
+    const key = String(credentials?.tiktok?.key || '').trim();
+    if (endpoint && key) return `${endpoint}/${key}`;
+  }
   throw new Error('Les paramètres de diffusion de cette destination sont incomplets.');
 }
 
 function safeFailureMessage(text) {
   if (/401|403|unauthori[sz]ed|forbidden|invalid.*key|publish.*denied|authentication|access denied/i.test(text)) {
-    return 'La plateforme a refusé la clé ou la destination. Vérifie les paramètres dans Twitch ou YouTube Studio.';
+    return 'La plateforme a refusé la clé ou la destination. Vérifie les paramètres dans Twitch, YouTube Studio ou l’application TikTok.';
   }
   if (/resolve|connection|network|timed out|timeout|refused|handshake|tls|socket/i.test(text)) {
     return 'Connexion impossible. Vérifie Internet, le pare-feu et l’adresse d’ingestion.';
@@ -313,7 +318,7 @@ function createStreamEngine({ app, emit, deps = {} }) {
     // Validate every destination before spawning so a partial start never leaves an orphan encoder.
     const destinations = [];
     for (const platform of platforms) {
-      if (!['twitch', 'youtube'].includes(platform)) throw new Error('Destination non prise en charge.');
+      if (!['twitch', 'youtube', 'tiktok'].includes(platform)) throw new Error('Destination non prise en charge.');
       if (destinations.some((destination) => destination.platform === platform)) {
         throw new Error('Cette destination est sélectionnée deux fois.');
       }

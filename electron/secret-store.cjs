@@ -1,7 +1,8 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
-const SUPPORTED = new Set(['twitch', 'youtube']);
+const SUPPORTED = new Set(['twitch', 'youtube', 'tiktok']);
+const PLATFORM_LABELS = Object.freeze({ twitch: 'Twitch', youtube: 'YouTube', tiktok: 'TikTok' });
 const MAX_SECRET_LENGTH = 512;
 
 function assertSecret(value, label) {
@@ -14,23 +15,42 @@ function assertSecret(value, label) {
   return value;
 }
 
-function validateYoutubeEndpoint(value) {
-  if (typeof value !== 'string' || value.length > 512 || /\s/.test(value)) {
-    throw new Error('Adresse d’ingestion YouTube invalide.');
-  }
+// TikTok change d’hôte d’ingestion selon les régions : seule la forme RTMP(S)
+// est vérifiée, pas le domaine. YouTube, lui, n’a qu’un hôte officiel.
+function validateIngestEndpoint(value, platform, { hostPattern = null, hint }) {
+  const label = PLATFORM_LABELS[platform];
+  const invalid = new Error(`Adresse d’ingestion ${label} invalide.`);
+  if (typeof value !== 'string' || value.length > 512 || /\s/.test(value)) throw invalid;
   let parsed;
   try {
     parsed = new URL(value);
   } catch {
-    throw new Error('Adresse d’ingestion YouTube invalide.');
+    throw invalid;
   }
   if (!['rtmp:', 'rtmps:'].includes(parsed.protocol)
-      || !/(^|\.)youtube\.com$/i.test(parsed.hostname)
+      || (hostPattern && !hostPattern.test(parsed.hostname))
       || parsed.username || parsed.password || parsed.search || parsed.hash
       || parsed.pathname === '/' || parsed.pathname.length < 2) {
-    throw new Error('Utilise l’adresse RTMP(S) fournie dans YouTube Studio.');
+    throw new Error(hint);
   }
   return `${parsed.protocol}//${parsed.host}${parsed.pathname.replace(/\/+$/, '')}`;
+}
+
+function validateYoutubeEndpoint(value) {
+  return validateIngestEndpoint(value, 'youtube', {
+    hostPattern: /(^|\.)youtube\.com$/i,
+    hint: 'Utilise l’adresse RTMP(S) fournie dans YouTube Studio.',
+  });
+}
+
+function validateTiktokEndpoint(value) {
+  return validateIngestEndpoint(value, 'tiktok', {
+    hint: 'Utilise l’adresse RTMP(S) fournie par l’application TikTok.',
+  });
+}
+
+function endpointValidator(platform) {
+  return platform === 'tiktok' ? validateTiktokEndpoint : validateYoutubeEndpoint;
 }
 
 function createSecretStore({ app, safeStorage }) {
@@ -69,7 +89,7 @@ function createSecretStore({ app, safeStorage }) {
 
   async function getStatus() {
     if (!encryptionAvailable()) {
-      return { available: false, twitch: false, youtube: false };
+      return { available: false, twitch: false, youtube: false, tiktok: false };
     }
     try {
       const data = await readAll();
@@ -77,9 +97,10 @@ function createSecretStore({ app, safeStorage }) {
         available: true,
         twitch: typeof data.twitch?.key === 'string' && data.twitch.key.length > 3,
         youtube: typeof data.youtube?.key === 'string' && typeof data.youtube?.endpoint === 'string',
+        tiktok: typeof data.tiktok?.key === 'string' && typeof data.tiktok?.endpoint === 'string',
       };
     } catch {
-      return { available: true, twitch: false, youtube: false, damaged: true };
+      return { available: true, twitch: false, youtube: false, tiktok: false, damaged: true };
     }
   }
 
@@ -90,9 +111,9 @@ function createSecretStore({ app, safeStorage }) {
     if (platform === 'twitch') {
       data.twitch = { key: assertSecret(input?.key, 'Clé Twitch') };
     } else {
-      data.youtube = {
-        endpoint: validateYoutubeEndpoint(input?.endpoint),
-        key: assertSecret(input?.key, 'Clé YouTube'),
+      data[platform] = {
+        endpoint: endpointValidator(platform)(input?.endpoint),
+        key: assertSecret(input?.key, `Clé ${PLATFORM_LABELS[platform]}`),
       };
     }
     await writeAll(data);
@@ -123,11 +144,8 @@ function createSecretStore({ app, safeStorage }) {
       if (!SUPPORTED.has(platform)) throw new Error('Cette plateforme n’est pas prise en charge.');
       const value = data[platform];
       if (platform === 'twitch' && value?.key) result.twitch = { key: value.key };
-      else if (platform === 'youtube' && value?.key && value?.endpoint) {
-        result.youtube = { key: value.key, endpoint: value.endpoint };
-      } else {
-        throw new Error(`Configure d’abord ${platform === 'twitch' ? 'Twitch' : 'YouTube'}.`);
-      }
+      else if (value?.key && value?.endpoint) result[platform] = { key: value.key, endpoint: value.endpoint };
+      else throw new Error(`Configure d’abord ${PLATFORM_LABELS[platform] || platform}.`);
     }
     return result;
   }

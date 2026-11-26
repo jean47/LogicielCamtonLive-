@@ -484,13 +484,6 @@ select:hover { border-color: #514680; }
 .platform-card h3 { font-size: var(--fs-base); }
 .platform-card p { flex: 1; font-size: var(--fs-xs); line-height: 1.55; color: var(--text-muted); }
 
-.platform-card .platform-note {
-  flex: none;
-  padding-top: 9px;
-  border-top: 1px dashed var(--line-strong);
-  color: var(--text-soft);
-}
-
 .platform-info:disabled { opacity: .55; cursor: not-allowed; }
 
 .connection-badge {

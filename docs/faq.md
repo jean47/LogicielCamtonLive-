@@ -1,6 +1,6 @@
 # FAQ Camton Live
 
-Version publiée le 27 novembre 2026, avec l'annonce de la destination TikTok pour le 2 décembre 2026.
+Version publiée le 2 décembre 2026, avec la destination TikTok.
 
 ## Camton Live diffuse-t-il vraiment en direct ?
 
@@ -16,7 +16,7 @@ YouTube Studio → **Créer** → **Passer au direct** → **Gérer** → **Prog
 
 ## Et TikTok ?
 
-La destination arrive le **2 décembre 2026**. Il faudra l'adresse du serveur et la clé de flux fournies par l'application TikTok. Deux différences avec Twitch : la clé change à chaque direct, et l'accès au direct dépend du compte et du pays.
+La destination est disponible **depuis le 2 décembre 2026**. Il faut l'adresse du serveur et la clé de flux fournies par l'application TikTok. Deux différences avec Twitch : la clé change à chaque direct, et l'accès au direct dépend du compte et du pays.
 
 Camton Live n'utilise aucune API non officielle. Si ton compte n'a pas l'option de clé de flux, un service de relais (Restream, Streamlabs) reste la solution.
 

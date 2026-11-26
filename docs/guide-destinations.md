@@ -44,9 +44,14 @@ Ce guide explique où trouver chaque information demandée par Camton Live. Les 
 
 ## TikTok
 
-La destination TikTok est disponible dans Camton Live **à partir du 2 décembre 2026**. La marche à suivre détaillée sera publiée à cette date.
+### Où trouver l'adresse du serveur et la clé
 
-### Ce qui est déjà vrai
+1. Ouvre l'application TikTok avec le compte qui diffuse.
+2. Lance la préparation d'un **direct** et choisis la diffusion par **clé de flux**. Le libellé dépend du compte et du pays (« Stream key », « Clé de flux », « Configurer le direct »).
+3. Copie l'**adresse du serveur** (elle commence par `rtmps://`) et la **clé de flux**.
+4. Colle les deux dans Camton Live, carte **TikTok**, puis coche « Ajouter à mon live ».
+
+### Ce qu'il faut savoir
 
 - TikTok ne fournit une adresse de serveur et une clé de flux qu'aux comptes qui ont accès au direct **et** à la diffusion par clé. L'accès dépend du compte, du pays et des conditions en vigueur.
 - La clé TikTok est liée à un direct : elle est régénérée pour chaque session et ne se réutilise pas comme une clé Twitch.
