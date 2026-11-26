@@ -90,22 +90,15 @@ npm run publish:update -- --execute
 `.github/workflows/release.yml` construit et publie tout à chaque tag : tests, ZIP portable, `Setup.exe` (NSIS installé par Chocolatey, donc sans Wine), manifeste signé par son empreinte, puis une release GitHub contenant les quatre fichiers. Le manifeste y est servi à une adresse stable, sans commit supplémentaire :
 
 ```
-https://github.com/<compte>/<dépôt>/releases/latest/download/latest.json
+https://github.com/jean47/LogicielCamtonLive-/releases/latest/download/latest.json
 ```
 
-Marche à suivre une seule fois :
-
-```bash
-git remote add origin https://github.com/<compte>/<dépôt>.git
-git push -u origin master
-```
-
-Puis, dans `electron/update-service.cjs`, remplace `UPDATE_MANIFEST_URL` par cette adresse `releases/latest/download/latest.json`, et publie une version :
+Le dépôt est `jean47/LogicielCamtonLive-` et `UPDATE_MANIFEST_URL` pointe déjà sur cette adresse. Pour publier une version :
 
 ```bash
 npm version 0.4.5 --no-git-tag-version   # ou modifie package.json et src/release-notes.json
 git commit -am "Camton Live 0.4.5"
-git tag v0.4.5 && git push origin master --tags
+git tag v0.4.5 && git push origin main --tags
 ```
 
 C’est le tag qui déclenche tout. Le contrôle `Tag = version` empêche de publier une version dont les numéros divergent, et `src/whats-new.test.js` empêche de livrer des nouveautés obsolètes.
