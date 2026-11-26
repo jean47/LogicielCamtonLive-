@@ -88,6 +88,19 @@ function showToast(message, type = 'success') {
   state.toastTimer = setTimeout(() => toast.classList.remove('show'), 4200);
 }
 
+const APP_VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '';
+const IS_BETA = /^0\./.test(APP_VERSION);
+
+function versionLabel() {
+  if (!APP_VERSION) return IS_BETA ? 'Bêta' : '';
+  return IS_BETA ? `Bêta ${APP_VERSION}` : APP_VERSION;
+}
+
+function renderAppVersion() {
+  const target = $('#appVersion');
+  if (target) target.textContent = versionLabel();
+}
+
 function renderUpdateNotice(update = state.updateStatus) {
   state.updateStatus = update || state.updateStatus;
   const notice = $('#updateNotice');
@@ -99,7 +112,7 @@ function renderUpdateNotice(update = state.updateStatus) {
   const version = state.updateStatus.latestVersion ? ` · ${state.updateStatus.latestVersion}` : '';
   const action = $('#updateAction');
   const progress = $('#updateProgressTrack');
-  $('#updateTitle').textContent = status === 'downloading' ? 'Téléchargement de la mise à jour' : status === 'downloaded' ? 'Mise à jour prête' : status === 'installing' ? 'Installation en cours' : `Mise à jour disponible${version}`;
+  $('#updateTitle').textContent = status === 'downloading' ? 'Téléchargement de la mise à jour' : status === 'downloaded' ? 'Mise à jour prête' : status === 'installing' ? 'Installation en cours' : `Mise à jour disponible${version}${IS_BETA ? ' bêta' : ''}`;
   progress.classList.toggle('hidden', status !== 'downloading' || !Number.isFinite(state.updateStatus.progress));
   if (status === 'downloading') {
     const percent = Number.isFinite(state.updateStatus.progress) ? state.updateStatus.progress : null;
@@ -359,17 +372,18 @@ async function startCaptureCard() {
   const selectedDevice = $('#captureCardSelect').value || deviceId;
   const deviceLabel = $('#captureCardSelect').selectedOptions?.[0]?.textContent || 'Carte de capture';
   try {
-    const stream = await openCaptureCard(selectedDevice);
+    const { stream, audioLabel } = await openCaptureCard(selectedDevice);
     const [videoTrack] = stream.getVideoTracks();
     const settings = videoTrack?.getSettings?.() || {};
     const hasAudio = stream.getAudioTracks().length > 0;
     if (!settings.width || !settings.height) {
       showToast('La carte est ouverte mais n’envoie aucune image. Vérifie le câble HDMI, que la Xbox est allumée, et qu’aucune autre application n’utilise la carte.', 'warning');
     } else if (!hasAudio) {
-      showToast('Image reçue, mais pas le son de la carte. Dans Windows, vérifie que son entrée audio est activée, sinon le micro sera la seule piste sonore.', 'warning');
+      const inputs = await listAudioInputLabels();
+      showToast(`Image reçue, mais aucune entrée audio de la carte n’a pu être ouverte. Entrées vues : ${inputs.length ? inputs.join(', ') : 'aucune'}.`, 'warning');
     }
     const size = settings.width && settings.height ? ` · ${settings.width}×${settings.height}` : '';
-    await startPreview(stream, `${deviceLabel}${size}${hasAudio ? ' · avec son' : ''}`);
+    await startPreview(stream, `${deviceLabel}${size}${hasAudio ? ` · son : ${audioLabel}` : ''}`);
   } catch (error) {
     showMediaError(error, 'la carte de capture');
   }
@@ -377,6 +391,16 @@ async function startCaptureCard() {
 
 // Une carte de capture expose souvent son audio sous un autre appareil que la
 // vidéo. Windows les rattache par groupId : c'est le son de la Xbox.
+async function listAudioInputLabels() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.filter((device) => device.kind === 'audioinput')
+      .map((device) => device.label || 'entrée sans nom');
+  } catch {
+    return [];
+  }
+}
+
 async function findCaptureAudioDevice(videoDeviceId) {
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
@@ -386,7 +410,12 @@ async function findCaptureAudioDevice(videoDeviceId) {
       ? audios.find((device) => device.groupId && device.groupId === video.groupId)
       : null;
     if (paired) return paired;
-    return audios.find((device) => /hdmi|digital audio|capture|game|usb/i.test(device.label || '')) || null;
+    const videoWords = String(video?.label || '').toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length > 3);
+    return audios.find((device) => {
+      const label = String(device.label || '').toLowerCase();
+      if (/hdmi|digital audio|capture|carte|game|usb|line in|aux|video/.test(label)) return true;
+      return videoWords.some((word) => label.includes(word));
+    }) || null;
   } catch {
     return null;
   }
@@ -396,26 +425,34 @@ async function findCaptureAudioDevice(videoDeviceId) {
 // On essaie du plus fidèle au plus modeste, avec puis sans le son de la carte.
 async function openCaptureCard(deviceId) {
   const audioDevice = await findCaptureAudioDevice(deviceId);
+  const audio = audioDevice ? { deviceId: { exact: audioDevice.deviceId } } : null;
+  const audioLabel = audioDevice?.label || '';
   const videoBase = { deviceId: { exact: deviceId } };
   const videoHd = { ...videoBase, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } };
-  const attempts = [
-    { video: videoHd },
-    { video: videoBase },
-    { video: videoHd, audio: false },
-    { video: videoBase, audio: false },
-  ];
-  if (audioDevice) {
-    attempts.splice(2, 0, { video: videoHd, audio: { deviceId: { exact: audioDevice.deviceId } } });
-  }
-  let lastError = null;
+
+  // Le son passe en premier : la vidéo seule réussit toujours et masquerait l'audio.
+  const attempts = audio
+    ? [{ video: videoHd, audio }, { video: videoBase, audio }]
+    : [{ video: videoHd, audio: true }, { video: videoBase, audio: true }];
+  attempts.push({ video: videoHd }, { video: videoBase });
+
   for (const constraints of attempts) {
     try {
-      return await navigator.mediaDevices.getUserMedia(constraints);
-    } catch (error) {
-      lastError = error;
-    }
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      if (stream.getAudioTracks().length) return { stream, audioLabel };
+    } catch { /* combinaison refusée par la carte, on essaie la suivante */ }
   }
-  throw lastError || new Error('La carte de capture n’a pas pu être ouverte.');
+
+  // Dernier recours : la carte refuse l'audio dans la même demande, on l'ouvre
+  // séparément puis on réunit les deux pistes.
+  const videoStream = await navigator.mediaDevices.getUserMedia({ video: videoBase });
+  if (!audio) return { stream: videoStream, audioLabel: '' };
+  try {
+    const audioStream = await navigator.mediaDevices.getUserMedia({ audio });
+    return { stream: new MediaStream([...videoStream.getVideoTracks(), ...audioStream.getAudioTracks()]), audioLabel };
+  } catch {
+    return { stream: videoStream, audioLabel: '' };
+  }
 }
 
 function toggleSourceTab(tab) {
@@ -977,6 +1014,7 @@ async function refreshCredentialStatus() {
 }
 
 function init() {
+  renderAppVersion();
   if (state.selectedPlatforms.size) {
     $$('[data-platform]').forEach((input) => { input.checked = state.selectedPlatforms.has(input.dataset.platform); });
   }

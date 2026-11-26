@@ -1,10 +1,10 @@
 {
-  "version": "0.4.6",
+  "version": "0.4.7",
   "notes": [
-    "Xbox : le son de la carte de capture est maintenant récupéré sur l’entrée audio du boîtier, celle que Windows rattache à la vidéo. Le micro n’est plus la seule piste sonore.",
-    "Xbox : la carte est ouverte avec plusieurs formats successifs (1280×720, puis le format natif), car certaines refusent celui demandé.",
-    "Xbox : un message distingue « aucune image reçue » (câble HDMI, HDCP, carte occupée) de « image reçue sans son ».",
-    "Son de la source réparé : la capture audio était refermée juste après son ouverture. Elle reste active jusqu’à l’arrêt de l’aperçu, confirmé par un message.",
+    "Xbox : le son de la carte de capture est ouvert en priorité avec la vidéo, sur l’entrée audio que Windows rattache au boîtier. C’était l’inverse auparavant, donc la vidéo seule réussissait et le son n’était jamais demandé.",
+    "Xbox : si la carte refuse le son dans la même demande, l’entrée audio est ouverte séparément puis réunie à l’image.",
+    "Xbox : en cas d’échec, le message liste les entrées audio vues par Windows, pour identifier le bon appareil.",
+    "Camton Live reste en bêta jusqu’à la version 1.0.0 : le pied de page et la notification de mise à jour affichent maintenant la version réelle.",
     "La notification de mise à jour n’affiche plus la ligne finale sur le téléchargement."
   ]
 }
