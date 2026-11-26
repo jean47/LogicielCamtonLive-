@@ -267,7 +267,14 @@ function stopTracks(stream) {
 
 function stopSource({ stopMic = true, stopScene = true } = {}) {
   if (state.recording) stopRecordingSession();
-  if (stopScene && state.overlayStream) stopOverlayCamera();
+  if (stopScene) {
+    if (state.overlayStream) stopOverlayCamera();
+    if (state.compositor) {
+      state.compositor.dispose();
+      state.compositor = null;
+      state.sceneEnabled = false;
+    }
+  }
   stopTracks(state.sourceStream);
   stopTracks(state.auxAudioStream);
   state.sourceStream = null;
@@ -302,9 +309,10 @@ async function startPreview(stream, label) {
   state.sourceStream = stream;
   const video = $('#previewVideo');
   video.srcObject = stream;
-  if (state.sceneEnabled && state.compositor) {
-    state.compositor.setMain(stream);
-    state.compositor.setOverlay(state.overlayStream, { corner: state.overlayCorner, scale: state.overlayScale });
+  if (state.sceneEnabled) {
+    const compositor = ensureCompositor();
+    compositor.setMain(stream);
+    compositor.setOverlay(state.overlayStream, { corner: state.overlayCorner, scale: state.overlayScale });
     applySceneStream();
   }
   $('#previewPlaceholder').classList.add('hidden');
@@ -963,14 +971,25 @@ function sceneVideoTracks() {
 
 function ensureCompositor() {
   const profile = LIVE_PROFILES[state.quality] || LIVE_PROFILES.balanced;
+  const sizeMatches = state.compositor
+    && state.compositor.canvas.width === profile.width
+    && state.compositor.canvas.height === profile.height;
+  const alive = state.compositor?.stream.getVideoTracks().some((track) => track.readyState === 'live');
+  // Un flux canvas garde la résolution fixée à sa création : changer de qualité en
+  // cours de route imposerait de tout reconstruire, ce qu'on évite pendant un direct.
+  if (state.compositor && (!alive || (!sizeMatches && !state.isStreaming && !state.recording))) {
+    state.compositor.dispose();
+    state.compositor = null;
+  }
   if (!state.compositor) {
     state.compositor = createCompositor({ width: profile.width, height: profile.height, fps: profile.fps });
     state.compositor.setMain(state.sourceStream);
+    state.compositor.setOverlay(state.overlayStream, { corner: state.overlayCorner, scale: state.overlayScale });
     state.compositor.setOverlayEnabled(Boolean(state.overlayStream));
     state.compositor.start();
-  } else {
-    state.compositor.resize(profile.width, profile.height);
-    if (state.sourceStream) state.compositor.setMain(state.sourceStream);
+    if (state.sceneEnabled) applySceneStream();
+  } else if (state.sourceStream) {
+    state.compositor.setMain(state.sourceStream);
   }
   return state.compositor;
 }
@@ -1051,12 +1070,13 @@ async function startOverlayCamera() {
 
 async function stopOverlayCamera() {
   if (!state.overlayStream) return;
+  const stream = state.overlayStream;
+  state.overlayStream = null;
+  state.sceneEnabled = false;
   state.compositor?.setOverlayEnabled(false);
   await state.compositor?.transition(transitionDuration());
-  stopTracks(state.overlayStream);
-  state.overlayStream = null;
+  stopTracks(stream);
   state.compositor?.setOverlay(null);
-  state.sceneEnabled = false;
   applySceneStream();
 }
 

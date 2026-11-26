@@ -96,7 +96,11 @@ export function createCompositor({
       const crop = coverRect(overlayVideo.videoWidth || 16, overlayVideo.videoHeight || 9, spot.width, spot.height);
       context.save();
       context.beginPath();
-      context.roundRect?.(spot.x, spot.y, spot.width, spot.height, Math.round(spot.width * 0.06));
+      if (typeof context.roundRect === 'function') {
+        context.roundRect(spot.x, spot.y, spot.width, spot.height, Math.round(spot.width * 0.06));
+      } else {
+        context.rect(spot.x, spot.y, spot.width, spot.height);
+      }
       context.clip();
       context.drawImage(
         overlayVideo,
@@ -162,7 +166,7 @@ export function createCompositor({
         snapshot.height = height;
         snapshot.getContext('2d').drawImage(canvas, 0, 0);
         fadeFrom = snapshot;
-        fadeStartedAt = performance?.now?.() ?? Date.now();
+        fadeStartedAt = globalThis.performance?.now?.() ?? Date.now();
         fadeDuration = durationMs;
       } catch {
         fadeFrom = null;
