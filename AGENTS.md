@@ -68,3 +68,5 @@ npm run desktop:win    # ffmpeg:fetch + build + electron-builder (ZIP portable)
 - `scripts/publish-update.mjs` : source de vérité du manifeste (`updates/latest.json`). Il relit `src/release-notes.json`, recalcule le SHA-256 de `release/Camton-Live-Setup-<version>-x64.exe` et assemble `dist-update/`. Sans `--execute`, il n’envoie rien.
 - `PUBLISH_URL_BASE` fixe le dossier public ; `{dir}` dans `PUBLISH_CMD` est remplacé par `dist-update/`.
 - `.github/workflows/release.yml` : tag `v*` → tests, ZIP, Setup.exe, manifeste, release. Utilise `releases/latest/download/` pour l’adresse du manifeste.
+- `.github/workflows/publish-later.yml` : publie `v0.5.0` par cron le 2 décembre 2026. Son job `garde` échoue si du code a changé depuis `target` (seuls `.github/`, `docs/` et les `.md` sont tolérés) : après un correctif destiné à la bêta, repointer `target` sur le nouveau commit, sinon la publication s’arrête au lieu de livrer l’ancien code.
+- Une version 0.x reste une **bêta** : titre de release suffixé « — bêta », `IS_BETA` piloté par la version, et `index.html` ne doit jamais figer un numéro (test dans `src/whats-new.test.js`).

@@ -36,10 +36,12 @@ jobs:
             echo "::error::La cible $cible est introuvable dans le dépôt."
             exit 1
           fi
-          # Seul .github/ peut différer : un fichier de workflow ne part pas dans l'app.
-          if ! git diff --quiet "$cible" HEAD -- . ':(exclude).github'; then
+          # Seuls les fichiers non livrés (workflows, docs) peuvent différer : une
+          # modif de README ne doit pas bloquer la publication, un changement de
+          # code ou d'empaquetage si.
+          if ! git diff --quiet "$cible" HEAD -- . ':(exclude).github' ':(exclude)docs' ':(exclude)*.md'; then
             echo "::error::Du code a changé depuis la cible $cible :"
-            git --no-pager diff --stat "$cible" HEAD -- . ':(exclude).github'
+            git --no-pager diff --stat "$cible" HEAD -- . ':(exclude).github' ':(exclude)docs' ':(exclude)*.md'
             echo "Mets à jour le champ target de publish-later.yml, ou assume l'ancienne version."
             exit 1
           fi
