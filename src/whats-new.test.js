@@ -46,3 +46,9 @@ test('les nouveautés embarquées correspondent à la version du paquet', () => 
   assert.equal(notes.version, pkg.version, 'src/release-notes.json doit suivre la version de package.json');
   assert.ok(notes.notes.length >= 3);
 });
+
+test('l’interface affiche la version sans la figer dans le HTML', () => {
+  const html = readFileSync(path.join(import.meta.dirname, '..', 'index.html'), 'utf8');
+  assert.match(html, /id="appVersionPill"/, 'la pastille de version doit être remplie par renderAppVersion()');
+  assert.deepEqual(html.match(/Bêta\s+\d+\.\d+/g) || [], [], 'aucun numéro de version ne doit être écrit en dur');
+});

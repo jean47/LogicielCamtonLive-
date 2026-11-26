@@ -107,13 +107,16 @@ const APP_VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '';
 const IS_BETA = /^0\./.test(APP_VERSION);
 
 function versionLabel() {
-  if (!APP_VERSION) return IS_BETA ? 'Bêta' : '';
+  if (!APP_VERSION) return 'Bêta';
   return IS_BETA ? `Bêta ${APP_VERSION}` : APP_VERSION;
 }
 
 function renderAppVersion() {
-  const target = $('#appVersion');
-  if (target) target.textContent = versionLabel();
+  const label = versionLabel();
+  for (const selector of ['#appVersion', '#appVersionPill']) {
+    const target = $(selector);
+    if (target) target.textContent = label;
+  }
 }
 
 function renderUpdateNotice(update = state.updateStatus) {

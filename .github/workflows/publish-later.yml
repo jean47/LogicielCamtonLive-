@@ -15,7 +15,37 @@ permissions:
   contents: write
 
 jobs:
+  # Refuse de publier si du code applicatif a changé depuis la cible : le run doit
+  # échouer bruyamment plutôt que livrer une bêta qui ignore les derniers correctifs.
+  garde:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: La cible couvre-t-elle le code publié ?
+        shell: bash
+        run: |
+          cible=$(sed -n 's/^ *target: *\([0-9a-f]\{40\}\) *$/\1/p' .github/workflows/publish-later.yml)
+          if [ -z "$cible" ]; then
+            echo "::error::Aucune cible lisible dans publish-later.yml."
+            exit 1
+          fi
+          if ! git cat-file -e "${cible}^{commit}" 2>/dev/null; then
+            echo "::error::La cible $cible est introuvable dans le dépôt."
+            exit 1
+          fi
+          # Seul .github/ peut différer : un fichier de workflow ne part pas dans l'app.
+          if ! git diff --quiet "$cible" HEAD -- . ':(exclude).github'; then
+            echo "::error::Du code a changé depuis la cible $cible :"
+            git --no-pager diff --stat "$cible" HEAD -- . ':(exclude).github'
+            echo "Mets à jour le champ target de publish-later.yml, ou assume l'ancienne version."
+            exit 1
+          fi
+
   publish:
+    needs: garde
     uses: ./.github/workflows/release.yml
     with:
       tag: v0.5.0
