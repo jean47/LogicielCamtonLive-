@@ -55,18 +55,18 @@ npm run desktop:win    # ffmpeg:fetch + build + electron-builder (ZIP portable)
 ## Nouveautés et publication
 
 - `src/release-notes.json` doit porter la même version que `package.json` (test dédié dans `src/whats-new.test.js`).
-- À chaque version publiée : mettre à jour `public/Updates/latest.json` (version, `downloadUrl`, `sha256`, `releaseNotes`) et le déposer sur l’hébergement du manifeste.
+- À chaque version publiée : le manifeste `latest.json` (version, `downloadUrl`, `sha256`, `releaseNotes`) est généré par `release.yml` et déposé en asset de la release. L’application n’interroge que `releases/latest/download/latest.json` : pas de second hébergement à maintenir.
 
 ## Installateur Windows
 
 - `installer/setup.nsi` + `scripts/build-installer.mjs` remplacent la cible `nsis` d’electron-builder, qui exige Wine sous Linux. `makensis` s’exécute nativement ; sous Linux il faut exporter `NSISDIR` vers la racine de la distribution (fait par le script).
 - Installation par utilisateur dans `%LOCALAPPDATA%\Programs\Camton Live` (`RequestExecutionLevel user`), avec `/S` pour la mise à jour silencieuse et `taskkill` de l’instance en cours avant la copie.
-- `release/` contient `Camton-Live-Setup-<version>-x64.exe` et `Camton-Live-Portable-<version>-x64.zip`. L’installateur doit être reconstruit après tout changement de `dist/`, puis son SHA-256 reporté dans `updates/latest.json`.
+- `release/` contient `Camton-Live-Setup-<version>-x64.exe` et `Camton-Live-Portable-<version>-x64.zip`. L’installateur doit être reconstruit après tout changement de `dist/`, puis son SHA-256 reporté par le manifeste de la release.
 
 ## Publication
 
-- `scripts/publish-update.mjs` : source de vérité du manifeste (`updates/latest.json`). Il relit `src/release-notes.json`, recalcule le SHA-256 de `release/Camton-Live-Setup-<version>-x64.exe` et assemble `dist-update/`. Sans `--execute`, il n’envoie rien.
-- `PUBLISH_URL_BASE` fixe le dossier public ; `{dir}` dans `PUBLISH_CMD` est remplacé par `dist-update/`.
+- `scripts/publish-update.mjs` : source de vérité du manifeste (`updates/latest.json`, recopié dans `dist-update/`). Il relit `src/release-notes.json`, recalcule le SHA-256 de `release/Camton-Live-Setup-<version>-x64.exe` et assemble `dist-update/`. Sans `--execute`, il n’envoie rien.
+- `PUBLISH_URL_BASE` est obligatoire et fixe le dossier public du manifeste ; `{dir}` dans `PUBLISH_CMD` est remplacé par `dist-update/`.
 - `.github/workflows/release.yml` : tag `v*` → tests, ZIP, Setup.exe, manifeste, release. Utilise `releases/latest/download/` pour l’adresse du manifeste.
 - `.github/workflows/publish-later.yml` : publie `v0.5.0` par cron le 2 décembre 2026. Son job `garde` échoue si du code a changé depuis `target` (seuls `.github/`, `docs/` et les `.md` sont tolérés) : après un correctif destiné à la bêta, repointer `target` sur le nouveau commit, sinon la publication s’arrête au lieu de livrer l’ancien code.
 - Une version 0.x reste une **bêta** : titre de release suffixé « — bêta », `IS_BETA` piloté par la version, et `index.html` ne doit jamais figer un numéro (test dans `src/whats-new.test.js`).

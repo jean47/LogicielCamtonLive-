@@ -5,7 +5,7 @@
 //   PUBLISH_CMD="rclone copy {dir} remote:camton-live/updates" npm run publish:update -- --execute
 //
 // Variables :
-//   PUBLISH_URL_BASE  dossier public où vivra le Setup.exe (obligatoire pour fixer downloadUrl)
+//   PUBLISH_URL_BASE  dossier public où vivra le Setup.exe (obligatoire)
 //   PUBLISH_CMD       commande de téléversement, {dir} remplacé par le dossier absolu
 
 import { execFileSync } from 'node:child_process';
@@ -45,12 +45,11 @@ if (!bullets.length) fail('src/release-notes.json ne contient aucune nouveauté 
 
 const sha256Setup = await sha256(setup);
 const manifestPath = path.join(ROOT, 'updates', 'latest.json');
-const previous = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) : {};
 const urlBase = (process.env.PUBLISH_URL_BASE || '').replace(/\/+$/, '');
 const fileName = path.basename(setup);
-const downloadUrl = urlBase ? `${urlBase}/${fileName}` : previous.downloadUrl;
 
-if (!downloadUrl) fail('Aucune adresse de téléchargement : définis PUBLISH_URL_BASE ou renseigne downloadUrl dans updates/latest.json.');
+if (!urlBase) fail('PUBLISH_URL_BASE est obligatoire : c’est l’adresse publique du dossier qui hébergera l’installateur.');
+const downloadUrl = `${urlBase}/${fileName}`;
 
 const manifest = {
   version,
@@ -64,6 +63,7 @@ rmSync(outDir, { recursive: true, force: true });
 mkdirSync(outDir, { recursive: true });
 copyFileSync(setup, path.join(outDir, fileName));
 if (existsSync(portable)) copyFileSync(portable, path.join(outDir, path.basename(portable)));
+mkdirSync(path.dirname(manifestPath), { recursive: true });
 writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
 copyFileSync(manifestPath, path.join(outDir, 'latest.json'));
 

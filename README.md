@@ -92,7 +92,7 @@ Deux fichiers sortent dans `release/` : le ZIP portable et `Camton-Live-Setup-<v
 ### Une commande, en local
 
 ```bash
-PUBLISH_URL_BASE=https://streamfacile-m7dasb9x.manus.space/updates npm run publish:update
+PUBLISH_URL_BASE=https://github.com/jean47/LogicielCamtonLive-/releases/latest/download npm run publish:update
 ```
 
 `scripts/publish-update.mjs` vérifie que `src/release-notes.json` porte la version de `package.json`, recalcule le SHA-256 de l’installateur, réécrit `updates/latest.json` et assemble `dist-update/` (installateur, ZIP, manifeste, empreintes). Rien n’est envoyé sans `--execute`. Pour envoyer automatiquement, ajoute la commande de ton hébergeur :
@@ -127,7 +127,7 @@ C’est le tag qui déclenche tout. Le contrôle `Tag = version` empêche de pub
 
 Deux fichiers doivent être publiés à chaque version :
 
-1. **`updates/latest.json`** — le manifeste lu en ligne par l’application : `version`, `downloadUrl`, `sha256` et `releaseNotes`. C’est le fichier à déposer sur l’hébergement du manifeste (`https://streamfacile-m7dasb9x.manus.space/updates/latest.json`). Le champ `releaseNotes` peut contenir plusieurs lignes ; chaque ligne devient une puce dans le pop-up. Le `sha256` doit être celui de l’installateur publié, sinon l’application refuse le fichier.
+1. **`updates/latest.json`** — le manifeste lu en ligne par l’application : `version`, `downloadUrl`, `sha256` et `releaseNotes`. Il est publié en asset de la release GitHub et lu à l’adresse `https://github.com/jean47/LogicielCamtonLive-/releases/latest/download/latest.json` ; aucun autre hébergement n’est interrogé. Le champ `releaseNotes` peut contenir plusieurs lignes ; chaque ligne devient une puce dans le pop-up. Le `sha256` doit être celui de l’installateur publié, sinon l’application refuse le fichier.
 2. **`src/release-notes.json`** — les nouveautés embarquées dans le paquet. Elles s’affichent dans le pop-up « Quoi de neuf » au premier lancement d’une nouvelle version, puis une seule fois par version installée.
 
 Le test `src/whats-new.test.js` vérifie que `src/release-notes.json` porte exactement la version de `package.json`, ce qui empêche de livrer une version avec les notes de la précédente.

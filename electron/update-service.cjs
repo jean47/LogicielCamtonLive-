@@ -8,11 +8,10 @@ const { Transform } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 const { URL } = require('node:url');
 
-// Le premier manifeste joignable fait foi : la release GitHub quand la
-// publication automatique tourne, l'hébergement historique en secours.
+// Le manifeste est un asset de la dernière release GitHub, déposé par
+// .github/workflows/release.yml : aucun hébergement tiers à maintenir.
 const UPDATE_MANIFEST_URLS = Object.freeze([
   'https://github.com/jean47/LogicielCamtonLive-/releases/latest/download/latest.json',
-  'https://streamfacile-m7dasb9x.manus.space/updates/latest.json',
 ]);
 const UPDATE_MANIFEST_URL = UPDATE_MANIFEST_URLS[0];
 const MANIFEST_MAX_BYTES = 256 * 1024;
