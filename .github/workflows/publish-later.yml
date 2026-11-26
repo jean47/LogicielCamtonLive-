@@ -52,4 +52,4 @@ jobs:
     with:
       tag: v0.5.0
       # Commit de la 0.5.0 : le tag n'est créé qu'au moment de la publication.
-      target: 86a87e6d78e2ce9013186583c168e54280618c58
+      target: 7014fdd455e89a7ea84b6f428df42f776955c0e6
