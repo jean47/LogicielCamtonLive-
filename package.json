@@ -8,7 +8,7 @@
   "author": "Camton Live contributors",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 3000 --strictPort",
-    "test": "node --test electron/*.test.cjs src/*.test.js",
+    "test": "node --test",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0 --port 3000 --strictPort",
     "desktop:dev": "concurrently -k \"npm:dev\" \"wait-on http://127.0.0.1:3000 && electron .\"",
