@@ -4,3 +4,4 @@ dist/
 .DS_Store
 release/
 vendor/ffmpeg/win-x64/
+dist-update/

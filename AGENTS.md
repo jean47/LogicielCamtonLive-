@@ -62,3 +62,9 @@ npm run desktop:win    # ffmpeg:fetch + build + electron-builder (ZIP portable)
 - `installer/setup.nsi` + `scripts/build-installer.mjs` remplacent la cible `nsis` d’electron-builder, qui exige Wine sous Linux. `makensis` s’exécute nativement ; sous Linux il faut exporter `NSISDIR` vers la racine de la distribution (fait par le script).
 - Installation par utilisateur dans `%LOCALAPPDATA%\Programs\Camton Live` (`RequestExecutionLevel user`), avec `/S` pour la mise à jour silencieuse et `taskkill` de l’instance en cours avant la copie.
 - `release/` contient `Camton-Live-Setup-<version>-x64.exe` et `Camton-Live-Portable-<version>-x64.zip`. L’installateur doit être reconstruit après tout changement de `dist/`, puis son SHA-256 reporté dans `updates/latest.json`.
+
+## Publication
+
+- `scripts/publish-update.mjs` : source de vérité du manifeste (`updates/latest.json`). Il relit `src/release-notes.json`, recalcule le SHA-256 de `release/Camton-Live-Setup-<version>-x64.exe` et assemble `dist-update/`. Sans `--execute`, il n’envoie rien.
+- `PUBLISH_URL_BASE` fixe le dossier public ; `{dir}` dans `PUBLISH_CMD` est remplacé par `dist-update/`.
+- `.github/workflows/release.yml` : tag `v*` → tests, ZIP, Setup.exe, manifeste, release. Utilise `releases/latest/download/` pour l’adresse du manifeste.

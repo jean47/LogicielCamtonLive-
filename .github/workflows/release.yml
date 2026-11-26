@@ -1,0 +1,69 @@
+name: Publier une version Windows
+
+# Crée une release GitHub complète à chaque tag `vX.Y.Z` :
+# ZIP portable, Setup.exe, latest.json et SHA256.txt. Le manifeste est ensuite servi
+# par https://github.com/<owner>/<repo>/releases/latest/download/latest.json
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Vérifier que le tag correspond à package.json
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::Tag $tag différent de package.json ($version)"
+            exit 1
+          fi
+
+      - run: npm ci
+      - run: npm test
+
+      - name: Installer NSIS
+        run: choco install nsis --yes --no-progress
+
+      - name: Construire l’interface
+        run: npm run build
+
+      - name: Récupérer FFmpeg Windows
+        run: npm run ffmpeg:fetch
+
+      - name: Empaqueter le ZIP portable et l’installateur
+        shell: bash
+        run: |
+          npx electron-builder --win zip --x64
+          node scripts/build-installer.mjs
+
+      - name: Préparer le manifeste (empreinte et nouveautés)
+        env:
+          PUBLISH_URL_BASE: https://github.com/${{ github.repository }}/releases/latest/download
+        run: node scripts/publish-update.mjs
+
+      - name: Publier la release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            release/Camton-Live-Setup-*.exe \
+            release/Camton-Live-Portable-*.zip \
+            dist-update/latest.json \
+            dist-update/SHA256.txt \
+            --title "Camton Live ${GITHUB_REF_NAME}" \
+            --generate-notes

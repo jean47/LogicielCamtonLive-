@@ -67,6 +67,49 @@ npm run desktop:win
 
 Deux fichiers sortent dans `release/` : le ZIP portable et `Camton-Live-Setup-<version>-x64.exe`. L’installateur est compilé par `npm run installer:win` avec `makensis` (fourni par NSIS) et le script `installer/setup.nsi` ; la cible `nsis` d’electron-builder n’est pas utilisée car elle exige Wine hors Windows. Il est également possible d’exécuter l’interface seule avec `npm run dev`; dans ce mode navigateur, la configuration sécurisée des clés et le moteur de diffusion sont désactivés.
 
+## Automatiser la publication
+
+### Une commande, en local
+
+```bash
+PUBLISH_URL_BASE=https://streamfacile-m7dasb9x.manus.space/updates npm run publish:update
+```
+
+`scripts/publish-update.mjs` vérifie que `src/release-notes.json` porte la version de `package.json`, recalcule le SHA-256 de l’installateur, réécrit `updates/latest.json` et assemble `dist-update/` (installateur, ZIP, manifeste, empreintes). Rien n’est envoyé sans `--execute`. Pour envoyer automatiquement, ajoute la commande de ton hébergeur :
+
+```bash
+PUBLISH_URL_BASE=https://exemple.com/updates \
+PUBLISH_CMD="rclone copy {dir} remote:camton-live/updates" \
+npm run publish:update -- --execute
+```
+
+`{dir}` est remplacé par le dossier absolu. La même variable accepte `scp`, `lftp`, `curl -T`, un script maison, etc. Pour enchaîner la construction complète : `npm run desktop:win` s’arrête après la préparation du manifeste.
+
+### Entièrement automatique, via GitHub Actions
+
+`.github/workflows/release.yml` construit et publie tout à chaque tag : tests, ZIP portable, `Setup.exe` (NSIS installé par Chocolatey, donc sans Wine), manifeste signé par son empreinte, puis une release GitHub contenant les quatre fichiers. Le manifeste y est servi à une adresse stable, sans commit supplémentaire :
+
+```
+https://github.com/<compte>/<dépôt>/releases/latest/download/latest.json
+```
+
+Marche à suivre une seule fois :
+
+```bash
+git remote add origin https://github.com/<compte>/<dépôt>.git
+git push -u origin master
+```
+
+Puis, dans `electron/update-service.cjs`, remplace `UPDATE_MANIFEST_URL` par cette adresse `releases/latest/download/latest.json`, et publie une version :
+
+```bash
+npm version 0.4.5 --no-git-tag-version   # ou modifie package.json et src/release-notes.json
+git commit -am "Camton Live 0.4.5"
+git tag v0.4.5 && git push origin master --tags
+```
+
+C’est le tag qui déclenche tout. Le contrôle `Tag = version` empêche de publier une version dont les numéros divergent, et `src/whats-new.test.js` empêche de livrer des nouveautés obsolètes.
+
 ## Publier une mise à jour
 
 Deux fichiers doivent être publiés à chaque version :

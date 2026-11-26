@@ -13,8 +13,9 @@
     "preview": "vite preview --host 0.0.0.0 --port 3000 --strictPort",
     "desktop:dev": "concurrently -k \"npm:dev\" \"wait-on http://127.0.0.1:3000 && electron .\"",
     "ffmpeg:fetch": "node scripts/fetch-ffmpeg.mjs",
-    "desktop:win": "npm run ffmpeg:fetch && npm run build && electron-builder --win zip --x64 && npm run installer:win",
-    "installer:win": "node scripts/build-installer.mjs"
+    "desktop:win": "npm run ffmpeg:fetch && npm run build && electron-builder --win zip --x64 && npm run installer:win && npm run publish:update",
+    "installer:win": "node scripts/build-installer.mjs",
+    "publish:update": "node scripts/publish-update.mjs"
   },
   "build": {
     "appId": "fr.camtonlive.desktop",
