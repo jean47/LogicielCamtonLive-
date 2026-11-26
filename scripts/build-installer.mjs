@@ -29,9 +29,20 @@ function findMakensis() {
   return null;
 }
 
-const makensis = findMakensis();
+let makensis = findMakensis();
+if (!makensis && process.platform !== 'win32') {
+  // La cible `nsis` d'electron-builder échoue sans Wine, mais elle télécharge
+  // d'abord la boîte à outils NSIS : on s'en sert uniquement pour cela.
+  console.log('Boîte à outils NSIS absente, téléchargement via electron-builder…');
+  try {
+    execFileSync('npx', ['electron-builder', '--win', 'nsis', '--x64'], { cwd: ROOT, stdio: 'ignore' });
+  } catch {
+    // Échec attendu à l'étape Wine : les gabarits sont déjà extraits.
+  }
+  makensis = findMakensis();
+}
 if (!makensis) {
-  console.error('makensis introuvable. Installe NSIS, ou lance `npx electron-builder --win zip` une fois pour télécharger la boîte à outils NSIS dans le cache, ou définis MAKENSIS=/chemin/vers/makensis.');
+  console.error('makensis introuvable. Installe NSIS, ou définis MAKENSIS=/chemin/vers/makensis.');
   process.exit(1);
 }
 

@@ -8,7 +8,13 @@ const { Transform } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 const { URL } = require('node:url');
 
-const UPDATE_MANIFEST_URL = 'https://github.com/jean47/LogicielCamtonLive-/releases/latest/download/latest.json';
+// Le premier manifeste joignable fait foi : la release GitHub quand la
+// publication automatique tourne, l'hébergement historique en secours.
+const UPDATE_MANIFEST_URLS = Object.freeze([
+  'https://github.com/jean47/LogicielCamtonLive-/releases/latest/download/latest.json',
+  'https://streamfacile-m7dasb9x.manus.space/updates/latest.json',
+]);
+const UPDATE_MANIFEST_URL = UPDATE_MANIFEST_URLS[0];
 const MANIFEST_MAX_BYTES = 256 * 1024;
 const INSTALLER_MAX_BYTES = 1024 * 1024 * 1024;
 const REDIRECT_LIMIT = 4;
@@ -114,6 +120,18 @@ function openHttpsResponse(rawUrl, { accept, timeoutMs }, redirects = 0) {
   });
 }
 
+async function readFirstManifest(urls) {
+  let lastError = null;
+  for (const url of urls) {
+    try {
+      return await readManifest(url);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error('Aucun serveur de mise à jour n’a répondu.');
+}
+
 async function readManifest(url) {
   const response = await openHttpsResponse(url, { accept: 'application/json', timeoutMs: 12000 });
   const chunks = [];
@@ -139,7 +157,7 @@ async function hashFile(filePath) {
   return hash.digest('hex');
 }
 
-function createUpdateService({ app, emit, getIsStreaming, manifestUrl = UPDATE_MANIFEST_URL }) {
+function createUpdateService({ app, emit, getIsStreaming, manifestUrl = UPDATE_MANIFEST_URL, manifestUrls = UPDATE_MANIFEST_URLS }) {
   let state = { status: 'idle', currentVersion: app.getVersion(), latestVersion: null, releaseNotes: '', progress: 0 };
   let latestManifest = null;
   let checkPromise = null;
@@ -161,7 +179,7 @@ function createUpdateService({ app, emit, getIsStreaming, manifestUrl = UPDATE_M
     if (!app.isPackaged) return setState('disabled');
     checkPromise = (async () => {
       try {
-        const manifest = await readManifest(manifestUrl);
+        const manifest = await readFirstManifest(manifestUrl ? [manifestUrl] : manifestUrls);
         latestManifest = manifest;
         const currentVersion = app.getVersion();
         if (compareVersions(manifest.version, currentVersion) <= 0) {
@@ -267,4 +285,4 @@ function createUpdateService({ app, emit, getIsStreaming, manifestUrl = UPDATE_M
   return Object.freeze({ check, download, install, getState: snapshot });
 }
 
-module.exports = { UPDATE_MANIFEST_URL, compareVersions, createUpdateService, parseManifest, parseVersion };
+module.exports = { UPDATE_MANIFEST_URL, UPDATE_MANIFEST_URLS, compareVersions, createUpdateService, parseManifest, parseVersion };
