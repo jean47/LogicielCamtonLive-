@@ -177,7 +177,7 @@ async function handleUpdateAction() {
   }
 }
 
-function showModal({ title, eyebrow = 'À SAVOIR', body, items = [], mark = 'i', action = 'J’ai compris' }) {
+function showModal({ title, eyebrow = 'À SAVOIR', body, items = [], sections = [], mark = 'i', action = 'J’ai compris' }) {
   if (state.modalCleanup) {
     state.modalCleanup();
     state.modalCleanup = null;
@@ -193,6 +193,26 @@ function showModal({ title, eyebrow = 'À SAVOIR', body, items = [], mark = 'i',
     const intro = document.createElement('p');
     intro.textContent = body;
     copy.append(intro);
+  }
+  for (const section of sections) {
+    const heading = document.createElement('h4');
+    heading.className = 'modal-section-title';
+    heading.textContent = section.title;
+    copy.append(heading);
+    if (section.text) {
+      const paragraph = document.createElement('p');
+      paragraph.textContent = section.text;
+      copy.append(paragraph);
+    }
+    if (section.items?.length) {
+      const list = document.createElement('ul');
+      for (const item of section.items) {
+        const li = document.createElement('li');
+        li.textContent = item;
+        list.append(li);
+      }
+      copy.append(list);
+    }
   }
   if (items.length) {
     const list = document.createElement('ul');
@@ -1267,18 +1287,79 @@ function scrollToSection(id) {
 
 function openGuide() {
   showModal({
-    title: 'On y va étape par étape', eyebrow: 'GUIDE CAMTON LIVE',
-    body: 'Prépare la source, vérifie le son, configure tes clés officielles, puis vérifie la qualité et le débit avant l’envoi.',
-    items: [
-      'Sur PC, choisis un écran, une fenêtre ou un jeu dans le sélecteur intégré.',
-      'Sur Xbox, branche une carte de capture HDMI compatible en USB au PC.',
-      'Teste ton micro; son niveau bouge quand l’application reçoit du son.',
-      'Configure Twitch avec ta clé personnelle ou YouTube avec le serveur et la clé de YouTube Studio.',
-      'Camton Live chiffre les clés sur Windows. Ne partage jamais une clé et ne saisis pas ton mot de passe.',
-      'YouTube peut exiger un événement préalablement configuré et démarré dans Studio.',
-      'La démo est uniquement locale. Le bouton de diffusion envoie un vrai flux aux destinations sélectionnées.',
-      'Windows peut avertir au téléchargement : l’installateur n’est pas encore signé. « Informations complémentaires » puis « Exécuter quand même ».',
-    ], mark: '?',
+    title: 'Où trouver quoi', eyebrow: 'GUIDE CAMTON LIVE', mark: '?', action: 'Compris',
+    body: 'Trois étapes : préparer la source, régler le son, brancher les destinations. Chaque clé se copie depuis la plateforme, jamais depuis un message reçu.',
+    sections: [
+      {
+        title: '1 · La source',
+        items: [
+          'PC : « Choisir mon écran / jeu » ouvre le sélecteur intégré. Une fenêtre suffit pour une application, un écran pour un jeu en plein écran.',
+          'Console : branche une carte de capture HDMI en USB, puis choisis la carte dans la même liste.',
+          'Le son d’un jeu ne suit pas une capture de fenêtre : choisis « Écran » si tu veux aussi le son système.',
+        ],
+      },
+      {
+        title: '2 · Le son',
+        items: [
+          'Le vu-mètre du micro doit bouger quand tu parles. S’il reste à zéro, choisis un autre micro dans la liste.',
+          'La piste « Son de la source » prend le son système ; « Musique » accepte un fichier local.',
+          'Un casque évite le larsen : le son des haut-parleurs revient dans le micro.',
+        ],
+      },
+      {
+        title: '3 · Twitch : où trouver la clé',
+        items: [
+          'Tableau de bord créateur → Paramètres → Diffusion → Clé de flux primaire → « Afficher », puis copie.',
+          'La clé Twitch est permanente : elle ne change que si tu la réinitialises.',
+          'Camton Live ne demande jamais ton mot de passe Twitch.',
+        ],
+      },
+      {
+        title: '4 · YouTube : où trouver l’adresse et la clé',
+        items: [
+          'YouTube Studio → Créer → Passer au direct → onglet « Gérer » → « Programmer un direct ».',
+          'Dans « Paramètres du flux », choisis « Diffusion personnalisée » : c’est le mode qui donne une adresse de serveur et une clé.',
+          'Copie l’adresse du serveur (elle commence par rtmps://) et la clé de diffusion.',
+          'Camton Live ne crée pas l’événement YouTube et ne peut pas toujours le démarrer à ta place.',
+        ],
+      },
+      {
+        title: '5 · TikTok : à partir du 2 décembre 2026',
+        items: [
+          'La destination sera activée dans Camton Live le 2 décembre 2026 ; la marche à suivre détaillée sera publiée ce jour-là.',
+          'Elle utilisera l’adresse du serveur et la clé de flux fournies par l’application TikTok, comme pour YouTube.',
+          'La clé TikTok est liée à un direct : elle se recopie avant chaque session.',
+        ],
+      },
+      {
+        title: '6 · Avant d’appuyer sur Démarrer',
+        items: [
+          'La liste de contrôle vérifie source, son et destination ; le compte à rebours de trois secondes laisse le temps de relire.',
+          'Chaque destination sélectionnée consomme son propre débit : deux plateformes, deux fois le débit montant.',
+          '« Encodage actif » signifie que l’encodeur tourne sur ce PC ; la réception se vérifie dans la plateforme.',
+          'Windows peut avertir au téléchargement : l’installateur n’est pas encore signé. « Informations complémentaires » puis « Exécuter quand même ».',
+        ],
+      },
+    ],
+  });
+}
+
+function openFaq() {
+  showModal({
+    title: 'Questions fréquentes', eyebrow: 'FAQ CAMTON LIVE', mark: '?', action: 'Fermer',
+    body: 'Les réponses courtes aux questions les plus posées.',
+    sections: [
+      { title: 'Camton Live diffuse-t-il vraiment en direct ?', text: 'Oui : l’application encode sur ton PC et envoie le flux à la plateforme configurée. Elle ne peut pas garantir la réception, car c’est la plateforme qui accepte ou refuse le flux. Vérifie l’état du direct dans Twitch ou dans YouTube Studio.' },
+      { title: 'Où trouver ma clé Twitch ?', text: 'Tableau de bord créateur → Paramètres → Diffusion → Clé de flux primaire, puis « Afficher » et copie.' },
+      { title: 'Où trouver l’adresse et la clé YouTube ?', text: 'YouTube Studio → Créer → Passer au direct → Gérer → Programmer un direct, puis « Diffusion personnalisée » dans les paramètres du flux. L’adresse commence par rtmps:// et la clé fait une trentaine de caractères.' },
+      { title: 'Et TikTok ?', text: 'La destination arrive le 2 décembre 2026. Il faudra l’adresse du serveur et la clé de flux fournies par l’application TikTok, et cette clé change à chaque direct. L’accès au direct dépend de ton compte et de ton pays.' },
+      { title: 'Mes clés partent-elles sur un serveur ?', text: 'Non. Elles sont chiffrées sur ton PC avec le stockage sécurisé de Windows et ne sont jamais réaffichées. Pendant un direct, l’adresse complète est passée à FFmpeg : elle peut donc apparaître dans un outil local d’inspection des processus.' },
+      { title: 'Puis-je diffuser sur plusieurs plateformes en même temps ?', text: 'Oui. Camton Live lance un encodage par destination. Deux plateformes, c’est deux fois le débit montant : vérifie ta connexion avant de cocher la deuxième.' },
+      { title: 'Quel réglage de qualité choisir ?', text: 'Fluide pour une connexion modeste (720p, 3 Mb/s), Équilibré par défaut (720p, 4,5 Mb/s), Très net pour un PC solide et une bonne fibre (1080p, 6 Mb/s). Le débit annoncé est par destination.' },
+      { title: 'Pourquoi Windows affiche-t-il un avertissement ?', text: 'L’installateur n’est pas encore signé. « Informations complémentaires » puis « Exécuter quand même ».' },
+      { title: 'Pourquoi l’application indique « Bêta » ?', text: 'Camton Live reste en bêta jusqu’à la version 1.0.0. Tes réglages sont conservés d’une version à l’autre, mais les destinations peuvent encore évoluer.' },
+      { title: 'Comment revenir à une version précédente ?', text: 'Les installateurs sont sur la page des versions GitHub. Une version plus ancienne s’installe par-dessus ; les clés enregistrées restent en place.' },
+    ],
   });
 }
 
@@ -1475,6 +1556,7 @@ function init() {
   });
   $('#recConvertBtn').addEventListener('click', () => convertLastRecording());
   $('#helpBtn').addEventListener('click', openGuide);
+  $('#faqBtn').addEventListener('click', openFaq);
   $('#helpTopBtn').addEventListener('click', openGuide);
   $('#dismissBanner').addEventListener('click', () => $('#demoBanner').remove());
   $('#privacyBtn').addEventListener('click', () => showModal({

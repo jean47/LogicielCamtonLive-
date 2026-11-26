@@ -793,6 +793,13 @@ select:hover { border-color: #514680; }
 .modal-copy { display: flex; flex-direction: column; gap: 12px; }
 .modal-copy p { font-size: var(--fs-sm); line-height: 1.65; color: var(--text-soft); }
 
+.modal-copy .modal-section-title {
+  margin: 6px 0 -4px;
+  font-size: var(--fs-sm);
+  font-weight: 650;
+  color: var(--text);
+}
+
 .modal-copy ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .modal-copy li {
   position: relative;
