@@ -12,7 +12,21 @@ permissions:
   contents: write
 
 jobs:
+  # Les tests du moteur utilisent un faux FFmpeg écrit en shell : ils supposent un
+  # système POSIX, d'où ce job Linux séparé du job d'empaquetage Windows.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
   windows:
+    needs: test
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,7 +47,6 @@ jobs:
           fi
 
       - run: npm ci
-      - run: npm test
 
       - name: Installer NSIS
         run: choco install nsis --yes --no-progress
