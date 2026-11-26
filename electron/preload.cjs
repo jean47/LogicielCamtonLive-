@@ -14,6 +14,13 @@ function onUpdateState(callback) {
   return () => ipcRenderer.removeListener('updates:state', listener);
 }
 
+function onRecordingState(callback) {
+  if (typeof callback !== 'function') return () => {};
+  const listener = (_event, payload) => callback(payload);
+  ipcRenderer.on('record:state', listener);
+  return () => ipcRenderer.removeListener('record:state', listener);
+}
+
 contextBridge.exposeInMainWorld('lumaCastDesktop', Object.freeze({
   isDesktopApp: true,
   listCaptureSources: () => ipcRenderer.invoke('desktop:list-capture-sources'),
@@ -26,6 +33,14 @@ contextBridge.exposeInMainWorld('lumaCastDesktop', Object.freeze({
   pushChunk: (chunk) => ipcRenderer.invoke('stream:chunk', chunk),
   stopStream: () => ipcRenderer.invoke('stream:stop'),
   onStreamStatus,
+  startRecording: () => ipcRenderer.invoke('record:start'),
+  pushRecordingChunk: (chunk) => ipcRenderer.invoke('record:chunk', chunk),
+  stopRecording: () => ipcRenderer.invoke('record:stop'),
+  discardRecording: () => ipcRenderer.invoke('record:discard'),
+  convertRecording: (filePath, durationMs) => ipcRenderer.invoke('record:convert', filePath, durationMs),
+  revealRecording: (filePath) => ipcRenderer.invoke('record:reveal', filePath),
+  getRecordingDirectory: () => ipcRenderer.invoke('record:directory'),
+  onRecordingState,
   getUpdateState: () => ipcRenderer.invoke('updates:get-state'),
   downloadUpdate: () => ipcRenderer.invoke('updates:download'),
   installUpdate: () => ipcRenderer.invoke('updates:install'),

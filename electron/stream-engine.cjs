@@ -140,7 +140,7 @@ function safeFailureMessage(text) {
 
 function buildFfmpegArgs(profile, outputUrl, encoderName = DEFAULT_ENCODER_NAME) {
   const encoder = encoderByName(encoderName);
-  const vf = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2:color=black,fps=${profile.fps},format=nv12`;
+  const vf = `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,pad=${profile.width}:${profile.height}:(ow-iw)/2:(oh-ih)/2:color=black,fps=${profile.fps},format=nv12,fade=t=in:st=0:d=1`;
   return [
     '-hide_banner', '-nostdin', '-nostats', '-loglevel', 'info', '-stats_period', '1', '-progress', 'pipe:1',
     '-fflags', '+genpts', '-thread_queue_size', '512', '-f', 'webm', '-i', 'pipe:0',

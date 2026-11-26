@@ -414,7 +414,22 @@
   -webkit-box-orient: vertical;
 }
 
-.dock-actions { display: flex; gap: 10px; justify-self: end; }
+.dock-actions { display: flex; gap: 10px; justify-self: end; flex-wrap: wrap; }
+
+.rec-button.is-recording {
+  border-color: #e0396d;
+  color: #ffd8e2;
+  background: rgba(224, 57, 109, 0.18);
+}
+
+.rec-button.is-recording span:first-child { color: #ff5c8a; }
+
+.rec-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
 
 .dock-note {
   grid-column: 1 / -1;

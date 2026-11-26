@@ -177,6 +177,28 @@ export class AudioMixer {
     if (this.master) this.master.gain.value = this.masterMuted ? 0 : this.masterVolume;
   }
 
+  // Fondu appliqué au gain principal : il touche le direct ET l'enregistrement,
+  // puisque les deux lisent la même destination.
+  fadeIn(durationMs = 800) {
+    if (!this.context || !this.master || this.masterMuted) return;
+    const now = this.context.currentTime;
+    const gain = this.master.gain;
+    gain.cancelScheduledValues(now);
+    gain.setValueAtTime(0.0001, now);
+    gain.linearRampToValueAtTime(this.masterVolume, now + durationMs / 1000);
+  }
+
+  async fadeOut(durationMs = 600) {
+    if (!this.context || !this.master) return;
+    const now = this.context.currentTime;
+    const gain = this.master.gain;
+    gain.cancelScheduledValues(now);
+    gain.setValueAtTime(Math.max(gain.value, 0.0001), now);
+    gain.linearRampToValueAtTime(0.0001, now + durationMs / 1000);
+    await new Promise((resolve) => setTimeout(resolve, durationMs + 50));
+    this.applyMaster();
+  }
+
   isAttached(id) {
     return Boolean(this.tracks.get(id)?.inputNode);
   }

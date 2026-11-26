@@ -1,9 +1,10 @@
 const path = require('node:path');
-const { app, BrowserWindow, desktopCapturer, ipcMain, safeStorage, session } = require('electron');
+const { app, BrowserWindow, desktopCapturer, ipcMain, safeStorage, session, shell } = require('electron');
 const { createSecretStore } = require('./secret-store.cjs');
 const { createStreamEngine } = require('./stream-engine.cjs');
 const { createUpdateService } = require('./update-service.cjs');
 const { createDisplayCaptureService } = require('./display-capture.cjs');
+const { createRecorder } = require('./recorder.cjs');
 
 const APP_ID = 'fr.camtonlive.desktop';
 const isDevelopment = !app.isPackaged;
@@ -13,6 +14,7 @@ let secretStore;
 let streamEngine;
 let updateService;
 let displayCapture;
+let recorder;
 
 function isTrustedUrl(url) {
   return isDevelopment
@@ -70,6 +72,10 @@ function emitStreamStatus(status) {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('stream:status', status);
 }
 
+function emitRecordingState(state) {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('record:state', state);
+}
+
 function emitUpdateState(status) {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('updates:state', status);
 }
@@ -100,6 +106,17 @@ handleTrusted('stream:start', async (_event, options) => {
 });
 handleTrusted('stream:chunk', (_event, chunk) => streamEngine.pushChunk(chunk));
 handleTrusted('stream:stop', () => streamEngine.stop());
+handleTrusted('record:start', () => recorder.start());
+handleTrusted('record:chunk', (_event, chunk) => recorder.push(chunk));
+handleTrusted('record:stop', () => recorder.stop());
+handleTrusted('record:discard', () => recorder.discard());
+handleTrusted('record:convert', (_event, filePath, durationMs) => recorder.convert(filePath, durationMs));
+handleTrusted('record:reveal', (_event, filePath) => {
+  const { path: target } = recorder.reveal(filePath);
+  shell.showItemInFolder(target);
+  return true;
+});
+handleTrusted('record:directory', () => recorder.directory());
 handleTrusted('updates:get-state', () => updateService.getState());
 handleTrusted('updates:download', () => updateService.download());
 handleTrusted('updates:install', () => updateService.install());
@@ -112,6 +129,7 @@ app.whenReady().then(() => {
     emit: emitUpdateState,
     getIsStreaming: () => streamEngine?.isActive() || false,
   });
+  recorder = createRecorder({ app, emit: emitRecordingState });
   displayCapture = createDisplayCaptureService({
     desktopCapturer,
     session: session.defaultSession,
@@ -133,10 +151,15 @@ app.whenReady().then(() => {
 });
 
 app.on('before-quit', (event) => {
-  if (!isQuitting && streamEngine?.isActive()) {
+  const streaming = streamEngine?.isActive();
+  const recording = recorder?.isRecording();
+  if (!isQuitting && (streaming || recording)) {
     event.preventDefault();
     isQuitting = true;
-    streamEngine.stop().finally(() => app.quit());
+    Promise.all([
+      streaming ? streamEngine.stop() : null,
+      recording ? recorder.stop() : null,
+    ]).finally(() => app.quit());
   }
 });
 

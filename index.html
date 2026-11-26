@@ -259,10 +259,16 @@
           </div>
           <p class="dock-hint" id="readinessText">Configure une destination, choisis une source et vérifie ton micro.</p>
           <div class="dock-actions">
+            <button class="button button-secondary rec-button" id="recBtn" type="button"><span aria-hidden="true">●</span> Enregistrer</button>
             <button class="button button-secondary" id="demoBtn" type="button"><span aria-hidden="true">▷</span> Essayer la démo locale</button>
             <button class="button button-primary start-live-button" id="startLiveBtn" type="button">Démarrer un direct <span aria-hidden="true">→</span></button>
           </div>
           <p class="dock-note"><span aria-hidden="true">ⓘ</span> <span id="bitrateNotice">Sélectionne une ou plusieurs destinations pour estimer le débit sortant.</span></p>
+          <p class="dock-note rec-line hidden" id="recLine" aria-live="polite">
+            <span id="recStatus"></span>
+            <button class="link-button hidden" id="recRevealBtn" type="button">Ouvrir le dossier</button>
+            <button class="link-button hidden" id="recConvertBtn" type="button">Convertir en MP4</button>
+          </p>
         </section>
       </div>
     </div>

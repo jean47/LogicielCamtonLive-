@@ -92,6 +92,13 @@ test('each profile drives resolution, frame rate and bitrate in the encoder argu
   }
 });
 
+test('the video opens on a one-second fade from black', () => {
+  const args = buildFfmpegArgs(PROFILES.balanced, 'rtmps://live.twitch.tv:443/app/key');
+  const filter = args[args.indexOf('-vf') + 1];
+  assert.match(filter, /fade=t=in:st=0:d=1/);
+  assert.ok(filter.trim().endsWith('fade=t=in:st=0:d=1'), 'le fondu reste en fin de chaîne');
+});
+
 test('the stream is re-encoded to H.264/AAC with optional audio and FLV output', () => {
   const args = buildFfmpegArgs(PROFILES.balanced, 'rtmps://live.twitch.tv:443/app/key');
   assert.equal(args[args.indexOf('-c:v') + 1], 'h264_mf');

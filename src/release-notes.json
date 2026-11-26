@@ -1,8 +1,9 @@
 {
-  "version": "0.4.8",
+  "version": "0.5.0",
   "notes": [
-    "TikTok LIVE retiré de l’interface : la carte « Indisponible » et son explication disparaissent, laissant uniquement Twitch et YouTube.",
-    "Cette destination ne pouvait de toute façon pas fonctionner : TikTok ne fournit pas de clé de diffusion aux logiciels tiers, et son accès dépend du compte et du pays.",
-    "Seuls Twitch et YouTube restent proposés, avec la carte de capture Xbox comme source."
+    "Nouveau bouton Enregistrer : garde une copie locale du direct, ou enregistre une vidéo sans rien diffuser. Fichier dans Vidéos\\Camton Live, avec minuterie, taille et conversion MP4 proposée à la fin.",
+    "Liste de contrôle avant le direct : source, son et destination, avec un compte à rebours de trois secondes au démarrage.",
+    "Fondus : le son monte et descend en douceur au lieu de claquer, et l’image s’ouvre depuis le noir en une seconde.",
+    "Camton Live reste en bêta jusqu’à la version 1.0.0 ; le pied de page et la notification affichent la version réelle."
   ]
 }

@@ -35,6 +35,14 @@ const state = {
   mixedStream: null,
   auxAudioStream: null,
   chunkQueue: Promise.resolve(),
+  recording: false,
+  recordRecorder: null,
+  recordQueue: Promise.resolve(),
+  recordBytes: 0,
+  recordStartedAt: 0,
+  recordingTimer: null,
+  lastRecording: null,
+  converting: false,
   queuedBytes: 0,
   toastTimer: null,
   modalCleanup: null,
@@ -48,6 +56,7 @@ const audioDesk = createAudioDesk({
   listElement: $('#audioTracks'),
   master: { volume: $('#masterVolume'), mute: $('#masterMuted'), meter: $('#masterLevel') },
   onStatus: ({ active, micReady }) => {
+    state.audioStatus = { active, micReady };
     $('#audioSectionStatus').innerHTML = micReady
       ? `<span class="status-dot ready"></span> ${active > 1 ? `${active} pistes actives` : 'Micro actif'}`
       : '<span class="status-dot muted"></span> Micro à activer';
@@ -251,6 +260,7 @@ function stopTracks(stream) {
 }
 
 function stopSource({ stopMic = true } = {}) {
+  if (state.recording) stopRecordingSession();
   stopTracks(state.sourceStream);
   stopTracks(state.auxAudioStream);
   state.sourceStream = null;
@@ -777,6 +787,182 @@ async function createBroadcastStream() {
   return state.mixedStream;
 }
 
+function formatBytes(bytes = 0) {
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} Ko`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} Mo`;
+}
+
+function formatClock(ms = 0) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+
+function recordingVideoTracks() {
+  return (state.sourceStream?.getVideoTracks() || []).filter((track) => track.readyState === 'live');
+}
+
+function renderRecordingUi() {
+  const button = $('#recBtn');
+  if (!button) return;
+  button.classList.toggle('is-recording', state.recording);
+  button.innerHTML = state.recording
+    ? '<span aria-hidden="true">■</span> Arrêter le REC'
+    : '<span aria-hidden="true">●</span> Enregistrer';
+  const line = $('#recLine');
+  const status = $('#recStatus');
+  const reveal = $('#recRevealBtn');
+  const convert = $('#recConvertBtn');
+  if (state.recording) {
+    status.textContent = `Enregistrement · ${formatClock(Date.now() - state.recordStartedAt)} · ${formatBytes(state.recordBytes)}`;
+    line.classList.remove('hidden');
+    reveal.classList.add('hidden');
+    convert.classList.add('hidden');
+    return;
+  }
+  if (state.lastRecording) {
+    const saved = state.lastRecording;
+    status.textContent = `Dernier enregistrement : ${saved.name} · ${formatBytes(saved.bytes)} · ${formatClock(saved.durationMs)}`;
+    line.classList.remove('hidden');
+    reveal.classList.remove('hidden');
+    convert.classList.remove('hidden');
+    convert.disabled = state.converting;
+    convert.textContent = state.converting ? `Conversion… ${state.convertPercent || 0} %` : 'Convertir en MP4';
+    return;
+  }
+  line.classList.add('hidden');
+}
+
+async function startRecordingSession() {
+  if (!desktop?.isDesktopApp) {
+    showLiveUnavailable();
+    return;
+  }
+  if (state.recording) return;
+  if (!recordingVideoTracks().length) {
+    showToast('Active une source vidéo avant d’enregistrer.', 'warning');
+    scrollToSection('source');
+    return;
+  }
+  const profile = LIVE_PROFILES[state.quality] || LIVE_PROFILES.balanced;
+  const button = $('#recBtn');
+  button.disabled = true;
+  try {
+    const mixed = await audioDesk.getOutputStream();
+    const stream = new MediaStream([...recordingVideoTracks(), ...mixed.getAudioTracks()]);
+    const info = await desktop.startRecording();
+    const mimeType = recorderMimeType();
+    const options = {
+      videoBitsPerSecond: Math.round(profile.bitrate * 1250),
+      audioBitsPerSecond: 160000,
+    };
+    const recorder = mimeType
+      ? new MediaRecorder(stream, { ...options, mimeType })
+      : new MediaRecorder(stream, options);
+    state.recordRecorder = recorder;
+    state.recordQueue = Promise.resolve();
+    state.recordBytes = 0;
+    state.recordStartedAt = Date.now();
+    state.lastRecording = null;
+    recorder.addEventListener('dataavailable', (event) => {
+      if (!event.data?.size) return;
+      const size = event.data.size;
+      state.recordQueue = state.recordQueue.then(async () => {
+        const bytes = await event.data.arrayBuffer();
+        const result = await desktop.pushRecordingChunk(bytes);
+        if (typeof result?.bytes === 'number') state.recordBytes = result.bytes;
+      }).catch((error) => {
+        showToast(error?.message || 'L’enregistrement n’a pas pu écrire sur le disque.', 'warning');
+        stopRecordingSession({ fromFailure: true });
+      });
+    });
+    recorder.addEventListener('error', () => {
+      if (state.recording) stopRecordingSession({ fromFailure: true });
+    });
+    recorder.start(1000);
+    audioDesk.fadeIn?.(500);
+    state.recording = true;
+    state.recordingTimer = setInterval(renderRecordingUi, 500);
+    renderRecordingUi();
+    showToast(`Enregistrement démarré : ${info.name}`);
+  } catch (error) {
+    showToast(error?.message || 'L’enregistrement n’a pas pu démarrer.', 'warning');
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function stopRecordingSession({ fromFailure = false } = {}) {
+  if (!state.recording && !state.recordRecorder) return;
+  const recorder = state.recordRecorder;
+  state.recording = false;
+  if (state.recordingTimer) clearInterval(state.recordingTimer);
+  state.recordingTimer = null;
+  try {
+    if (recorder && recorder.state !== 'inactive') {
+      await new Promise((resolve) => {
+        recorder.addEventListener('stop', resolve, { once: true });
+        recorder.stop();
+      });
+    }
+    await state.recordQueue.catch(() => {});
+    const info = await desktop.stopRecording();
+    if (info?.name) {
+      state.lastRecording = info;
+      showToast(fromFailure
+        ? `Enregistrement interrompu : ${info.name} (${formatBytes(info.bytes)})`
+        : `Enregistrement terminé : ${info.name} (${formatBytes(info.bytes)})`);
+    }
+  } catch (error) {
+    showToast(error?.message || 'La fin de l’enregistrement a échoué.', 'warning');
+  } finally {
+    state.recordRecorder = null;
+    renderRecordingUi();
+  }
+}
+
+function toggleRecording() {
+  return state.recording ? stopRecordingSession() : startRecordingSession();
+}
+
+async function convertLastRecording() {
+  if (!state.lastRecording || state.converting) return;
+  state.converting = true;
+  state.convertPercent = 0;
+  renderRecordingUi();
+  try {
+    const result = await desktop.convertRecording(state.lastRecording.path, state.lastRecording.durationMs);
+    showToast(`Vidéo MP4 prête : ${result.name}`);
+    await desktop.revealRecording(result.path);
+  } catch (error) {
+    showToast(error?.message || 'La conversion en MP4 a échoué. Le fichier WebM reste utilisable.', 'warning');
+  } finally {
+    state.converting = false;
+    renderRecordingUi();
+  }
+}
+
+function renderReadiness() {
+  const target = $('#readinessText');
+  if (!target || state.isStreaming || state.isStarting) return;
+  const source = recordingVideoTracks().length > 0;
+  const sound = Boolean(state.audioStatus?.micReady || state.audioStatus?.active > 0);
+  const destination = state.selectedPlatforms.size > 0
+    && [...state.selectedPlatforms].every((platform) => state.credentialStatus[platform]);
+  const mark = (ok) => (ok ? '✓' : '✗');
+  const ready = source && sound && destination;
+  const text = `${mark(source)} source · ${mark(sound)} son · ${mark(destination)} destination — ${ready ? 'prêt à diffuser' : 'complète ce qui manque'}`;
+  if (target.textContent !== text) target.textContent = text;
+}
+
+async function countdownBeforeLive() {
+  if (state.skipCountdown) return;
+  for (let remaining = 3; remaining > 0; remaining -= 1) {
+    $('#streamStatus').textContent = `Direct dans ${remaining}…`;
+    showToast(`Direct dans ${remaining}…`);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+}
+
 function recorderMimeType() {
   const candidates = ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm'];
   return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || '';
@@ -854,7 +1040,9 @@ async function startLive() {
       if (state.isStreaming && !state.stopRequested) stopLive({ fromFailure: true });
     });
 
+    await countdownBeforeLive();
     await desktop.startStream({ platforms, profileName: state.quality });
+    audioDesk.fadeIn?.(800);
     recorder.start(1000);
     state.isStreaming = true;
     renderUpdateNotice();
@@ -893,6 +1081,7 @@ async function stopLive({ fromFailure = false } = {}) {
   if (state.stopRequested) return;
   state.stopRequested = true;
   const recorder = state.mediaRecorder;
+  if (state.isStreaming) await audioDesk.fadeOut?.(500);
   if (recorder && recorder.state !== 'inactive') {
     await new Promise((resolve) => {
       recorder.addEventListener('stop', resolve, { once: true });
@@ -1022,7 +1211,15 @@ function init() {
   if (qualityInput) qualityInput.checked = true;
   selectQuality(state.quality);
   state.removeStreamListener = desktop?.onStreamStatus?.(renderDestinationStatus) || null;
+  renderReadiness();
+  state.readinessTimer = setInterval(renderReadiness, 1000);
   state.removeUpdateListener = desktop?.onUpdateState?.(renderUpdateNotice) || null;
+  state.removeRecordingListener = desktop?.onRecordingState?.((payload) => {
+    if (payload?.status === 'converting') {
+      state.convertPercent = payload.percent || 0;
+      renderRecordingUi();
+    }
+  }) || null;
   desktop?.getUpdateState?.().then(renderUpdateNotice).catch(() => {});
 
   $('#updateAction').addEventListener('click', handleUpdateAction);
@@ -1101,6 +1298,16 @@ function init() {
   }));
   $('#demoBtn').addEventListener('click', startDemo);
   $('#startLiveBtn').addEventListener('click', () => state.isStreaming ? stopLive() : startLive());
+  $('#recBtn').addEventListener('click', () => toggleRecording());
+  $('#recRevealBtn').addEventListener('click', async () => {
+    if (!state.lastRecording) return;
+    try {
+      await desktop.revealRecording(state.lastRecording.path);
+    } catch (error) {
+      showToast(error?.message || 'Impossible d’ouvrir le dossier des enregistrements.', 'warning');
+    }
+  });
+  $('#recConvertBtn').addEventListener('click', () => convertLastRecording());
   $('#helpBtn').addEventListener('click', openGuide);
   $('#helpTopBtn').addEventListener('click', openGuide);
   $('#dismissBanner').addEventListener('click', () => $('#demoBanner').remove());
