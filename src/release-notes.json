@@ -1,10 +1,8 @@
 {
-  "version": "0.4.5",
+  "version": "0.4.6",
   "notes": [
-    "L’encodeur choisit maintenant tout seul le meilleur H.264 disponible sur ton PC : NVIDIA, Intel, AMD, puis Media Foundation. Chaque candidat est testé sur une vraie image avant le direct, fini les plantages au démarrage.",
-    "YouTube : l’adresse RTMP du port 1935 est automatiquement convertie en RTMPS sécurisé sur le port 443, celui que les box et les réseaux d’entreprise laissent passer. Une clé collée par erreur dans l’adresse est retirée.",
-    "Piste « Son de la source » : le son système est capté même sur une fenêtre, en ouvrant une capture d’écran dédiée à l’audio.",
-    "En cas d’échec, un rapport détaillé est écrit sur le Bureau : encodeur utilisé, code de sortie et dernières lignes FFmpeg.",
-    "Les messages d’erreur nomment l’encodeur actif et distinguent une clé refusée d’une connexion bloquée."
+    "Son de la source réparé : la capture audio était refermée juste après son ouverture, ce qui rendait la piste muette. Elle reste maintenant active jusqu’à l’arrêt de l’aperçu.",
+    "Un message confirme dès l’aperçu si le son système a bien rejoint le mixage, au lieu de laisser une piste silencieuse sans explication.",
+    "Le mixage ne conserve que les pistes audio de la source : moins de travail pour le processeur pendant un direct."
   ]
 }

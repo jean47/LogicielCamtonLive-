@@ -285,7 +285,7 @@ async function startPreview(stream, label) {
   const fps = settings.frameRate ? Math.round(settings.frameRate) : 30;
   $('#resolutionLabel').textContent = width && height ? `${width} × ${height} · ${fps} FPS` : `Aperçu local · ${fps} FPS`;
   setSourceStatus(`${label} — aperçu en cours`, true);
-  audioDesk.setSourceStream(stream);
+  const sourceAudio = await audioDesk.setSourceStream(stream);
   videoTrack?.addEventListener('ended', () => {
     if (state.sourceStream !== stream) return;
     if (state.isStreaming) {
@@ -299,7 +299,14 @@ async function startPreview(stream, label) {
   $('#readinessText').textContent = 'Aperçu local prêt. Configure une destination et vérifie ton micro pour diffuser.';
   $('#navSourceCheck').textContent = '✓';
   $('#navSourceCheck').classList.add('done');
-  showToast('Aperçu local activé. Rien n’est encore envoyé aux plateformes.');
+  if (stream.getAudioTracks().length) {
+    showToast(sourceAudio
+      ? 'Aperçu local activé avec le son système. Rien n’est encore envoyé aux plateformes.'
+      : 'Aperçu actif, mais le son système n’a pas pu être ajouté au mixage. Le micro fonctionne quand même.',
+      sourceAudio ? 'info' : 'warning');
+  } else {
+    showToast('Aperçu local activé sans son de la source. Rien n’est encore envoyé aux plateformes.', 'warning');
+  }
   await video.play().catch(() => {});
 }
 
@@ -891,16 +898,20 @@ async function startDesktopCapture(source) {
       if (['NotAllowedError', 'PermissionDeniedError', 'AbortError'].includes(error?.name)) throw error;
       stream = await capture(false);
     }
+    let auxAudioStream = null;
     if (!stream.getAudioTracks().length) {
-      const loopback = await captureLoopbackAudio().catch(() => null);
-      if (loopback) {
-        state.auxAudioStream = loopback;
-        stream = new MediaStream([...stream.getVideoTracks(), ...loopback.getAudioTracks()]);
-      } else {
-        showToast('Aucun son système capté. Pour le son d’un jeu ou d’une vidéo, choisis « Écran » dans la liste des sources.', 'warning');
+      auxAudioStream = await captureLoopbackAudio().catch(() => null);
+      if (auxAudioStream) {
+        stream = new MediaStream([...stream.getVideoTracks(), ...auxAudioStream.getAudioTracks()]);
       }
     }
     await startPreview(stream, source.name || 'Écran / fenêtre PC');
+    // startPreview commence par stopSource(), qui libère state.auxAudioStream :
+    // publier la capture avant l'appel la coupait immédiatement.
+    state.auxAudioStream = auxAudioStream;
+    if (!auxAudioStream && !stream.getAudioTracks().length) {
+      showToast('Aucun son système capté. Pour le son d’un jeu ou d’une vidéo, choisis « Écran » dans la liste des sources.', 'warning');
+    }
   } catch (error) {
     showMediaError(error, 'l’écran ou la fenêtre');
   }

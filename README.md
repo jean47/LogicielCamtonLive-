@@ -8,10 +8,10 @@ Camton Live est un studio de streaming en français qui s’ouvre dans sa propre
 
 Deux formats sont livrés :
 
-- **`Camton-Live-Setup-0.4.5-x64.exe`** (recommandé) : installation par utilisateur dans `%LOCALAPPDATA%\Programs\Camton Live`, sans droits administrateur. Raccourcis sur le bureau et dans le menu Démarrer, désinstallation propre, prise en charge de l’installation silencieuse (`/S`) utilisée par les mises à jour.
-- **`Camton-Live-Portable-0.4.5-x64.zip`** : décompresse l’archive, puis lance `Camton Live.exe`. À garder dans son dossier, pas seul sur le bureau.
+- **`Camton-Live-Setup-0.4.6-x64.exe`** (recommandé) : installation par utilisateur dans `%LOCALAPPDATA%\Programs\Camton Live`, sans droits administrateur. Raccourcis sur le bureau et dans le menu Démarrer, désinstallation propre, prise en charge de l’installation silencieuse (`/S`) utilisée par les mises à jour.
+- **`Camton-Live-Portable-0.4.6-x64.zip`** : décompresse l’archive, puis lance `Camton Live.exe`. À garder dans son dossier, pas seul sur le bureau.
 
-Les deux versions partagent les mêmes réglages (mêmes identifiants d’application), donc installer la 0.4.5 par-dessus une version portable conserve ton mixage et tes clés. Les exécutables ne sont pas signés : Windows peut afficher SmartScreen (« Informations complémentaires » puis « Exécuter quand même »). Le paquet comprend FFmpeg et ses composants LGPL partagés, avec les avis de licence dans `resources/licenses/`. L’encodeur H.264 est choisi au démarrage parmi NVIDIA NVENC, Intel Quick Sync, AMD AMF et Media Foundation, chacun validé par un encodage d’essai.
+Les deux versions partagent les mêmes réglages (mêmes identifiants d’application), donc installer la 0.4.6 par-dessus une version portable conserve ton mixage et tes clés. Les exécutables ne sont pas signés : Windows peut afficher SmartScreen (« Informations complémentaires » puis « Exécuter quand même »). Le paquet comprend FFmpeg et ses composants LGPL partagés, avec les avis de licence dans `resources/licenses/`. L’encodeur H.264 est choisi au démarrage parmi NVIDIA NVENC, Intel Quick Sync, AMD AMF et Media Foundation, chacun validé par un encodage d’essai.
 
 ## Configurer une destination
 
@@ -96,9 +96,9 @@ https://github.com/jean47/LogicielCamtonLive-/releases/latest/download/latest.js
 Le dépôt est `jean47/LogicielCamtonLive-` et `UPDATE_MANIFEST_URL` pointe déjà sur cette adresse. Pour publier une version :
 
 ```bash
-npm version 0.4.5 --no-git-tag-version   # ou modifie package.json et src/release-notes.json
-git commit -am "Camton Live 0.4.5"
-git tag v0.4.5 && git push origin main --tags
+npm version 0.4.6 --no-git-tag-version   # ou modifie package.json et src/release-notes.json
+git commit -am "Camton Live 0.4.6"
+git tag v0.4.6 && git push origin main --tags
 ```
 
 C’est le tag qui déclenche tout. Le contrôle `Tag = version` empêche de publier une version dont les numéros divergent, et `src/whats-new.test.js` empêche de livrer des nouveautés obsolètes.

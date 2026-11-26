@@ -308,19 +308,19 @@ export function createAudioDesk({ listElement, master, onStatus, onError, onToas
       }
       render();
     },
-    setSourceStream(stream) {
+    async setSourceStream(stream) {
       sourceStream = stream;
       const track = tracks.get('source');
-      if (!track) return;
+      if (!track) return false;
       if (!stream || !stream.getAudioTracks().length) {
         stopCapture(track);
         render();
-        return;
+        return false;
       }
-      mixer.attachStream(track.id, stream).then((attached) => {
-        track.active = attached;
-        render();
-      }).catch(() => render());
+      const attached = await mixer.attachStream(track.id, stream).catch(() => false);
+      track.active = attached;
+      render();
+      return attached;
     },
     async ensurePrimaryMic() {
       const track = tracks.get('mic');
