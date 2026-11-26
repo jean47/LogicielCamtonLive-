@@ -123,7 +123,7 @@ function renderUpdateNotice(update = state.updateStatus) {
     action.disabled = false;
   } else {
     const notes = state.updateStatus.releaseNotes?.trim();
-    $('#updateMessage').textContent = notes ? `${notes}\n\nTélécharge-la quand tu es prêt·e; l’installation ne démarrera pas pendant un direct.` : 'Télécharge-la quand tu es prêt·e; l’installation ne démarrera pas pendant un direct.';
+    $('#updateMessage').textContent = notes || 'Une nouvelle version est prête à être téléchargée.';
     action.textContent = 'Télécharger la mise à jour';
     action.disabled = false;
   }
@@ -357,18 +357,65 @@ async function startCaptureCard() {
     }
   }
   const selectedDevice = $('#captureCardSelect').value || deviceId;
+  const deviceLabel = $('#captureCardSelect').selectedOptions?.[0]?.textContent || 'Carte de capture';
   try {
-    let stream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: selectedDevice }, frameRate: { ideal: 30 } }, audio: true });
-    } catch {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: selectedDevice }, frameRate: { ideal: 30 } }, audio: false });
-      showToast('Aperçu vidéo actif. Le son de cette carte n’est pas disponible; le micro reste nécessaire pour diffuser.', 'warning');
+    const stream = await openCaptureCard(selectedDevice);
+    const [videoTrack] = stream.getVideoTracks();
+    const settings = videoTrack?.getSettings?.() || {};
+    const hasAudio = stream.getAudioTracks().length > 0;
+    if (!settings.width || !settings.height) {
+      showToast('La carte est ouverte mais n’envoie aucune image. Vérifie le câble HDMI, que la Xbox est allumée, et qu’aucune autre application n’utilise la carte.', 'warning');
+    } else if (!hasAudio) {
+      showToast('Image reçue, mais pas le son de la carte. Dans Windows, vérifie que son entrée audio est activée, sinon le micro sera la seule piste sonore.', 'warning');
     }
-    await startPreview(stream, 'Carte de capture Xbox');
+    const size = settings.width && settings.height ? ` · ${settings.width}×${settings.height}` : '';
+    await startPreview(stream, `${deviceLabel}${size}${hasAudio ? ' · avec son' : ''}`);
   } catch (error) {
     showMediaError(error, 'la carte de capture');
   }
+}
+
+// Une carte de capture expose souvent son audio sous un autre appareil que la
+// vidéo. Windows les rattache par groupId : c'est le son de la Xbox.
+async function findCaptureAudioDevice(videoDeviceId) {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const video = devices.find((device) => device.kind === 'videoinput' && device.deviceId === videoDeviceId);
+    const audios = devices.filter((device) => device.kind === 'audioinput');
+    const paired = video?.groupId
+      ? audios.find((device) => device.groupId && device.groupId === video.groupId)
+      : null;
+    if (paired) return paired;
+    return audios.find((device) => /hdmi|digital audio|capture|game|usb/i.test(device.label || '')) || null;
+  } catch {
+    return null;
+  }
+}
+
+// Certaines cartes refusent le format demandé (1080p60 en USB 2, YUY2 saturé).
+// On essaie du plus fidèle au plus modeste, avec puis sans le son de la carte.
+async function openCaptureCard(deviceId) {
+  const audioDevice = await findCaptureAudioDevice(deviceId);
+  const videoBase = { deviceId: { exact: deviceId } };
+  const videoHd = { ...videoBase, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } };
+  const attempts = [
+    { video: videoHd },
+    { video: videoBase },
+    { video: videoHd, audio: false },
+    { video: videoBase, audio: false },
+  ];
+  if (audioDevice) {
+    attempts.splice(2, 0, { video: videoHd, audio: { deviceId: { exact: audioDevice.deviceId } } });
+  }
+  let lastError = null;
+  for (const constraints of attempts) {
+    try {
+      return await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error('La carte de capture n’a pas pu être ouverte.');
 }
 
 function toggleSourceTab(tab) {
