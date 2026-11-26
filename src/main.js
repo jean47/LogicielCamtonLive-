@@ -1,4 +1,5 @@
 import { LIVE_PROFILES, PLATFORM_DETAILS, PLATFORM_IDS } from './platforms.js';
+import { createCompositor } from './compositor.js';
 import { createAudioDesk } from './audio-desk.js';
 import releaseNotes from './release-notes.json';
 import { parseNotes, shouldAnnounce } from './whats-new.js';
@@ -35,6 +36,11 @@ const state = {
   mixedStream: null,
   auxAudioStream: null,
   chunkQueue: Promise.resolve(),
+  compositor: null,
+  overlayStream: null,
+  sceneEnabled: false,
+  overlayCorner: 'br',
+  overlayScale: 0.22,
   recording: false,
   recordRecorder: null,
   recordQueue: Promise.resolve(),
@@ -259,8 +265,9 @@ function stopTracks(stream) {
   if (stream) stream.getTracks().forEach((track) => track.stop());
 }
 
-function stopSource({ stopMic = true } = {}) {
+function stopSource({ stopMic = true, stopScene = true } = {}) {
   if (state.recording) stopRecordingSession();
+  if (stopScene && state.overlayStream) stopOverlayCamera();
   stopTracks(state.sourceStream);
   stopTracks(state.auxAudioStream);
   state.sourceStream = null;
@@ -291,10 +298,15 @@ function showMediaError(error, noun = 'la source vidéo') {
 
 async function startPreview(stream, label) {
   if (state.isStreaming) await stopLive();
-  stopSource();
+  stopSource({ stopScene: false });
   state.sourceStream = stream;
   const video = $('#previewVideo');
   video.srcObject = stream;
+  if (state.sceneEnabled && state.compositor) {
+    state.compositor.setMain(stream);
+    state.compositor.setOverlay(state.overlayStream, { corner: state.overlayCorner, scale: state.overlayScale });
+    applySceneStream();
+  }
   $('#previewPlaceholder').classList.add('hidden');
   $('#previewFrame').classList.add('has-video');
   $('#previewOverlay').classList.add('visible');
@@ -779,11 +791,11 @@ function showLiveUnavailable() {
 }
 
 async function createBroadcastStream() {
-  if (!state.sourceStream?.getVideoTracks().some((track) => track.readyState === 'live')) throw new Error('Aucune source vidéo active.');
+  if (!sceneVideoTracks().length) throw new Error('Aucune source vidéo active.');
   if (!(await audioDesk.ensurePrimaryMic())) throw new Error('Choisis un microphone pour continuer.');
   const mixed = await audioDesk.getOutputStream();
   if (!mixed.getAudioTracks().length) throw new Error('Le mixage audio n’a produit aucune piste.');
-  state.mixedStream = new MediaStream([...state.sourceStream.getVideoTracks(), ...mixed.getAudioTracks()]);
+  state.mixedStream = new MediaStream([...sceneVideoTracks(), ...mixed.getAudioTracks()]);
   return state.mixedStream;
 }
 
@@ -798,7 +810,7 @@ function formatClock(ms = 0) {
 }
 
 function recordingVideoTracks() {
-  return (state.sourceStream?.getVideoTracks() || []).filter((track) => track.readyState === 'live');
+  return sceneVideoTracks();
 }
 
 function renderRecordingUi() {
@@ -939,6 +951,117 @@ async function convertLastRecording() {
     state.converting = false;
     renderRecordingUi();
   }
+}
+
+function sceneVideoTracks() {
+  if (state.sceneEnabled && state.compositor) {
+    const tracks = state.compositor.stream.getVideoTracks().filter((track) => track.readyState === 'live');
+    if (tracks.length) return tracks;
+  }
+  return (state.sourceStream?.getVideoTracks() || []).filter((track) => track.readyState === 'live');
+}
+
+function ensureCompositor() {
+  const profile = LIVE_PROFILES[state.quality] || LIVE_PROFILES.balanced;
+  if (!state.compositor) {
+    state.compositor = createCompositor({ width: profile.width, height: profile.height, fps: profile.fps });
+    state.compositor.setMain(state.sourceStream);
+    state.compositor.setOverlayEnabled(Boolean(state.overlayStream));
+    state.compositor.start();
+  } else {
+    state.compositor.resize(profile.width, profile.height);
+    if (state.sourceStream) state.compositor.setMain(state.sourceStream);
+  }
+  return state.compositor;
+}
+
+function applySceneStream() {
+  const video = $('#previewVideo');
+  if (!video) return;
+  if (state.sceneEnabled && state.compositor) {
+    video.srcObject = state.compositor.stream;
+    const profile = LIVE_PROFILES[state.quality] || LIVE_PROFILES.balanced;
+    $('#resolutionLabel').textContent = `Scène ${profile.width} × ${profile.height} · ${profile.fps} FPS`;
+  } else if (state.sourceStream) {
+    video.srcObject = state.sourceStream;
+  }
+  const badge = $('#sceneSectionStatus');
+  if (badge) {
+    badge.innerHTML = state.sceneEnabled
+      ? '<span class="status-dot ready"></span> Caméra incrustée'
+      : '<span class="status-dot muted"></span> Caméra inactive';
+  }
+  const button = $('#overlayCamBtn');
+  if (button) {
+    button.innerHTML = state.sceneEnabled
+      ? '<span aria-hidden="true">▣</span> Retirer la caméra'
+      : '<span aria-hidden="true">▣</span> Activer la caméra';
+  }
+  renderReadiness();
+}
+
+function transitionDuration() {
+  return Number($('#sceneTransition')?.value || 0);
+}
+
+async function populateOverlayCameras() {
+  const select = $('#overlayCameraSelect');
+  if (!select || !navigator.mediaDevices?.enumerateDevices) return;
+  const devices = (await navigator.mediaDevices.enumerateDevices())
+    .filter((device) => device.kind === 'videoinput');
+  const current = select.value;
+  select.replaceChildren();
+  if (!devices.length) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'Aucune caméra détectée';
+    select.append(option);
+    return;
+  }
+  for (const device of devices) {
+    const option = document.createElement('option');
+    option.value = device.deviceId;
+    option.textContent = device.label || 'Caméra sans nom';
+    select.append(option);
+  }
+  if (devices.some((device) => device.deviceId === current)) select.value = current;
+}
+
+async function startOverlayCamera() {
+  const deviceId = $('#overlayCameraSelect')?.value;
+  if (state.overlayStream) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: deviceId
+        ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
+        : { width: { ideal: 1280 }, height: { ideal: 720 } },
+    });
+    state.overlayStream = stream;
+    state.sceneEnabled = true;
+    const compositor = ensureCompositor();
+    compositor.setOverlay(stream, { corner: state.overlayCorner, scale: state.overlayScale });
+    compositor.setOverlayEnabled(true);
+    await compositor.transition(transitionDuration());
+    applySceneStream();
+    showToast('Caméra incrustée sur la scène.');
+  } catch (error) {
+    showMediaError(error, 'la caméra');
+  }
+}
+
+async function stopOverlayCamera() {
+  if (!state.overlayStream) return;
+  state.compositor?.setOverlayEnabled(false);
+  await state.compositor?.transition(transitionDuration());
+  stopTracks(state.overlayStream);
+  state.overlayStream = null;
+  state.compositor?.setOverlay(null);
+  state.sceneEnabled = false;
+  applySceneStream();
+}
+
+async function toggleOverlayCamera() {
+  return state.overlayStream ? stopOverlayCamera() : startOverlayCamera();
 }
 
 function renderReadiness() {
@@ -1299,6 +1422,25 @@ function init() {
   $('#demoBtn').addEventListener('click', startDemo);
   $('#startLiveBtn').addEventListener('click', () => state.isStreaming ? stopLive() : startLive());
   $('#recBtn').addEventListener('click', () => toggleRecording());
+  $('#overlayCamBtn').addEventListener('click', () => toggleOverlayCamera());
+  $('#overlayCameraSelect').addEventListener('focus', () => { populateOverlayCameras().catch(() => {}); });
+  $('#overlayCameraSelect').addEventListener('change', async () => {
+    if (!state.overlayStream) return;
+    await stopOverlayCamera();
+    await startOverlayCamera();
+  });
+  $('#overlayScale').addEventListener('input', (event) => {
+    state.overlayScale = Number(event.target.value) / 100;
+    state.compositor?.setOverlay(state.overlayStream, { corner: state.overlayCorner, scale: state.overlayScale });
+  });
+  $$('.corner-btn').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.overlayCorner = button.dataset.corner;
+      $$('.corner-btn').forEach((other) => other.classList.toggle('is-active', other === button));
+      state.compositor?.setOverlay(state.overlayStream, { corner: state.overlayCorner, scale: state.overlayScale });
+    });
+  });
+  populateOverlayCameras().catch(() => {});
   $('#recRevealBtn').addEventListener('click', async () => {
     if (!state.lastRecording) return;
     try {

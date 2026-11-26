@@ -7,6 +7,18 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+  # Appelé par publish-later.yml pour publier un tag déjà poussé, à une date choisie.
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Tag à publier (ex. v0.5.0)'
+        type: string
+        required: true
+      target:
+        description: 'Commit à taguer si le tag n’existe pas encore'
+        type: string
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -28,8 +40,13 @@ jobs:
   windows:
     needs: test
     runs-on: windows-latest
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      RELEASE_TARGET: ${{ inputs.target }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target || inputs.tag || github.ref_name }}
 
       - uses: actions/setup-node@v4
         with:
@@ -39,7 +56,7 @@ jobs:
       - name: Vérifier que le tag correspond à package.json
         shell: bash
         run: |
-          tag="${GITHUB_REF_NAME#v}"
+          tag="${RELEASE_TAG#v}"
           version="$(node -p "require('./package.json').version")"
           if [ "$tag" != "$version" ]; then
             echo "::error::Tag $tag différent de package.json ($version)"
@@ -75,12 +92,15 @@ jobs:
         run: |
           # Pas de --prerelease : /releases/latest ignore les préversions et
           # casserait la mise à jour automatique. Le suffixe suffit à l'affichage.
-          TITLE="Camton Live ${GITHUB_REF_NAME}"
-          case "${GITHUB_REF_NAME}" in v0.*) TITLE="${TITLE} — bêta" ;; esac
-          gh release create "${GITHUB_REF_NAME}" \
+          TITLE="Camton Live ${RELEASE_TAG}"
+          case "${RELEASE_TAG}" in v0.*) TITLE="${TITLE} — bêta" ;; esac
+          TARGET_ARGS=()
+          if [ -n "${RELEASE_TARGET}" ]; then TARGET_ARGS=(--target "${RELEASE_TARGET}"); fi
+          gh release create "${RELEASE_TAG}" \
             release/Camton-Live-Setup-*.exe \
             release/Camton-Live-Portable-*.zip \
             dist-update/latest.json \
             dist-update/SHA256.txt \
             --title "${TITLE}" \
+            "${TARGET_ARGS[@]}" \
             --generate-notes

@@ -183,6 +183,48 @@
             </div>
           </section>
 
+          <section class="section" id="scene" aria-labelledby="sceneTitle">
+            <header class="section-head">
+              <span class="section-index">02b</span>
+              <div class="section-title">
+                <h2 id="sceneTitle">Ta scène</h2>
+                <p>Une caméra en incrustation par-dessus la source, avec un fondu enchaîné.</p>
+              </div>
+              <span class="section-status" id="sceneSectionStatus"><span class="status-dot muted"></span> Caméra inactive</span>
+            </header>
+
+            <div class="panel scene-panel">
+              <div class="scene-row">
+                <button class="button button-secondary" id="overlayCamBtn" type="button"><span aria-hidden="true">▣</span> Activer la caméra</button>
+                <label class="scene-field">
+                  <span>Caméra</span>
+                  <select id="overlayCameraSelect"><option value="">Détecter les caméras…</option></select>
+                </label>
+                <label class="scene-field">
+                  <span>Transition</span>
+                  <select id="sceneTransition">
+                    <option value="0">Immédiate</option>
+                    <option value="500" selected>Fondu 0,5 s</option>
+                    <option value="1000">Fondu 1 s</option>
+                  </select>
+                </label>
+              </div>
+              <div class="scene-row">
+                <label class="scene-field scene-field--wide">
+                  <span>Taille de la vignette</span>
+                  <input id="overlayScale" type="range" min="12" max="40" step="1" value="22" />
+                </label>
+                <div class="scene-corners" role="group" aria-label="Coin de la vignette">
+                  <button class="mixer-btn corner-btn is-active" type="button" data-corner="br" title="En bas à droite">↘</button>
+                  <button class="mixer-btn corner-btn" type="button" data-corner="bl" title="En bas à gauche">↙</button>
+                  <button class="mixer-btn corner-btn" type="button" data-corner="tr" title="En haut à droite">↗</button>
+                  <button class="mixer-btn corner-btn" type="button" data-corner="tl" title="En haut à gauche">↖</button>
+                </div>
+              </div>
+              <p class="microcopy" id="sceneHint">La composition remplace l’image brute : l’aperçu, le direct et l’enregistrement utilisent la même scène.</p>
+            </div>
+          </section>
+
           <section class="section" id="platforms" aria-labelledby="platformsTitle">
             <header class="section-head">
               <span class="section-index">03</span>

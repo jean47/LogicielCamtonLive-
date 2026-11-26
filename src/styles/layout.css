@@ -424,6 +424,22 @@
 
 .rec-button.is-recording span:first-child { color: #ff5c8a; }
 
+.scene-panel { display: grid; gap: 14px; }
+
+.scene-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.scene-field { display: grid; gap: 6px; font-size: 12px; color: var(--muted, #9aa4b2); }
+.scene-field--wide { flex: 1; min-width: 180px; }
+.scene-field select, .scene-field input[type="range"] { width: 100%; }
+
+.scene-corners { display: flex; gap: 6px; }
+.corner-btn.is-active { border-color: #6ee7b7; color: #d7ffe9; }
+
 .rec-line {
   display: flex;
   flex-wrap: wrap;

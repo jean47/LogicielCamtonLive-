@@ -1,0 +1,21 @@
+name: Publication différée
+
+# Publie une version déjà taguée, à la date choisie, sans intervention manuelle.
+# Le tag v0.5.0 est poussé mais aucune release n'existe tant que ce workflow n'a
+# pas tourné : /releases/latest reste donc sur la version précédente.
+#
+# 2 décembre 2026, 09:00 UTC = 10:00 à Paris (heure d'hiver).
+# GitHub peut décaler de quelques minutes en cas de forte charge.
+on:
+  schedule:
+    - cron: '0 9 2 12 *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: v0.5.0

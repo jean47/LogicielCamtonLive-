@@ -1,9 +1,12 @@
 {
   "version": "0.5.0",
   "notes": [
-    "Nouveau bouton Enregistrer : garde une copie locale du direct, ou enregistre une vidéo sans rien diffuser. Fichier dans Vidéos\\Camton Live, avec minuterie, taille et conversion MP4 proposée à la fin.",
-    "Liste de contrôle avant le direct : source, son et destination, avec un compte à rebours de trois secondes au démarrage.",
-    "Fondus : le son monte et descend en douceur au lieu de claquer, et l’image s’ouvre depuis le noir en une seconde.",
-    "Camton Live reste en bêta jusqu’à la version 1.0.0 ; le pied de page et la notification affichent la version réelle."
+    "Nouvelle scène : caméra en incrustation par-dessus la source, avec choix du coin, de la taille et de la caméra.",
+    "Transitions : fondu enchaîné de 0,5 ou 1 seconde quand la caméra apparaît ou disparaît, ou changement immédiat.",
+    "L’aperçu, le direct et l’enregistrement utilisent la même scène composée : ce que tu vois est ce qui part.",
+    "Nouveau bouton Enregistrer : copie locale du direct, ou enregistrement sans diffuser. Fichier dans Vidéos\\Camton Live, conversion MP4 proposée à la fin.",
+    "Liste de contrôle avant le direct (source, son, destination) et compte à rebours de trois secondes.",
+    "Fondus audio à l’entrée et à la sortie, image qui s’ouvre depuis le noir.",
+    "Camton Live reste en bêta jusqu’à la version 1.0.0."
   ]
 }
