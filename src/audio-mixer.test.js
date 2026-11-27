@@ -34,6 +34,15 @@ function createStubContext() {
     async resume() {},
     async close() {},
     createGain: () => makeNode('gain'),
+    createDynamicsCompressor: () => {
+      const node = makeNode('compressor');
+      node.threshold = { value: 0 };
+      node.knee = { value: 0 };
+      node.ratio = { value: 1 };
+      node.attack = { value: 0.003 };
+      node.release = { value: 0.25 };
+      return node;
+    },
     createAnalyser: () => makeNode('analyser'),
     createMediaStreamSource: () => makeNode('streamSource'),
     createMediaElementSource: () => makeNode('elementSource'),
@@ -110,7 +119,17 @@ test('le contexte, le master et la destination sont créés une seule fois', asy
   await mixer.ensureContext();
   assert.equal(context.nodes.filter((node) => node.type === 'destination').length, 1);
   assert.equal(context.nodes.filter((node) => node.type === 'gain').length, 1);
-  assert.ok(mixer.master.targets.includes(mixer.destination));
+  assert.equal(context.nodes.filter((node) => node.type === 'compressor').length, 1);
+  assert.ok(mixer.master.targets.includes(mixer.limiter));
+  assert.ok(mixer.limiter.targets.includes(mixer.destination));
+});
+
+test('un limiteur protège la sortie de l’écrêtage', async () => {
+  const { mixer } = createMixer();
+  await mixer.ensureContext();
+  assert.equal(mixer.limiter.threshold.value, -3);
+  assert.equal(mixer.limiter.ratio.value, 20);
+  assert.equal(mixer.limiter.knee.value, 0);
 });
 
 test('une piste attachée traverse gain, analyseur puis master', async () => {

@@ -95,7 +95,7 @@ async function readEncoderNames(executable, spawnProcess) {
 function probeEncoder(executable, encoder, profile, spawnProcess) {
   const args = [
     '-hide_banner', '-loglevel', 'error',
-    '-f', 'lavfi', '-i', 'testsrc2=size=640x360:rate=30',
+    '-f', 'lavfi', '-i', `testsrc2=size=${profile.width}x${profile.height}:rate=${profile.fps}`,
     '-frames:v', '5',
     '-c:v', encoder.name, ...encoder.options(profile), '-pix_fmt', encoder.pixFmt,
     '-an', '-f', 'null', '-',
@@ -281,12 +281,15 @@ function createStreamEngine({ app, emit, deps = {} }) {
   }
 
   async function selectEncoder(executable, profile, candidates) {
-    const cached = encoderCache.get(executable);
+    // Le cache porte sur le profil : un encodeur validé en 720p30 peut ne pas tenir
+    // le 1080p60, et c'est précisément ce que le sondage doit départager.
+    const cacheKey = `${executable}|${profile.width}x${profile.height}@${profile.fps}`;
+    const cached = encoderCache.get(cacheKey);
     const remembered = cached && candidates.find((candidate) => candidate.name === cached);
     if (remembered) return { encoder: remembered, verified: true };
     for (const candidate of candidates) {
       if (await probeEncoder(executable, candidate, profile, spawnProcess)) {
-        encoderCache.set(executable, candidate.name);
+        encoderCache.set(cacheKey, candidate.name);
         return { encoder: candidate, verified: true };
       }
     }

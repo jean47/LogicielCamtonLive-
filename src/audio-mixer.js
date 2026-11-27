@@ -37,6 +37,7 @@ export class AudioMixer {
     this.createStream = createStream || ((tracks) => new MediaStream(tracks));
     this.context = null;
     this.master = null;
+    this.limiter = null;
     this.masterAnalyser = null;
     this.destination = null;
     this.tracks = new Map();
@@ -52,8 +53,17 @@ export class AudioMixer {
       this.masterAnalyser = this.context.createAnalyser();
       this.masterAnalyser.fftSize = 256;
       this.destination = this.context.createMediaStreamDestination();
-      this.master.connect(this.masterAnalyser);
-      this.master.connect(this.destination);
+      this.limiter = this.context.createDynamicsCompressor();
+      // Plusieurs pistes à plein volume dépassent 0 dB : sans limiteur, l'écrêtage
+      // s'entend comme un grésillement sur la plateforme.
+      this.limiter.threshold.value = -3;
+      this.limiter.knee.value = 0;
+      this.limiter.ratio.value = 20;
+      this.limiter.attack.value = 0.003;
+      this.limiter.release.value = 0.25;
+      this.master.connect(this.limiter);
+      this.limiter.connect(this.masterAnalyser);
+      this.limiter.connect(this.destination);
       this.applyMaster();
     }
     if (this.context.state === 'suspended') await this.context.resume();
