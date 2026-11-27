@@ -1,6 +1,6 @@
 # FAQ Camton Live
 
-Version publiée le 2 décembre 2026, avec la destination TikTok et le relais.
+Version publiée le 3 décembre 2026, avec la supervision des sorties, le test de débit, quatre destinations et le rapport de problème. TikTok et le relais sont arrivés le 2 décembre.
 
 ## Camton Live diffuse-t-il vraiment en direct ?
 
