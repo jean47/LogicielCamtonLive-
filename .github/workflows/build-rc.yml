@@ -1,0 +1,36 @@
+name: Build de test (temporaire)
+
+# Construit la 0.5.2 depuis la tête de main et la dépose en pré-version jetable.
+# Aucun effet sur /releases/latest : les pré-versions en sont exclues.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: v0.5.2
+      target: db1dbe1215de85758c0dbc7c0f72d2fc885739c9
+
+  depot:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: camton-build
+          path: release-files
+      - name: Déposer la pré-version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -lh release-files
+          gh release create v0.5.2-rc.1 release-files/* \
+            --title "Camton Live 0.5.2 — build de test" \
+            --prerelease \
+            --notes "Build de test, hors calendrier de publication. Contient le correctif d'installation."
