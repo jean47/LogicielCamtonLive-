@@ -41,3 +41,13 @@ test('the prefilled issue stays a URL and points at the repository', () => {
   assert.match(body, /Version : 0\.5\.2/);
   assert.equal(body.includes('live_'), false);
 });
+
+test('the report carries renderer errors so a half-drawn screen can be explained', () => {
+  const report = buildReport({
+    version: '0.5.4',
+    rendererIssues: ['error : Uncaught TypeError: Cannot read properties of null', 'warning : déconnexion du micro'],
+  });
+  assert.match(report, /Erreurs de l’interface/);
+  assert.match(report, /Cannot read properties of null/);
+  assert.match(report, /déconnexion du micro/);
+});

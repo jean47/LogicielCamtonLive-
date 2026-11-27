@@ -18,6 +18,18 @@ let updateService;
 let displayCapture;
 let recorder;
 let bugReporter;
+// Les erreurs du renderer n'apparaissent nulle part dans une version empaquetée :
+// on les garde pour le rapport de problème, sinon un écran incomplet reste muet.
+const rendererIssues = [];
+
+function recordRendererIssue(payload) {
+  const level = String(payload?.level ?? '');
+  if (!/error|warning/i.test(level)) return;
+  const text = String(payload?.message || '').trim().slice(0, 400);
+  if (!text) return;
+  rendererIssues.push(`${level} : ${text}`);
+  if (rendererIssues.length > 20) rendererIssues.shift();
+}
 
 function isTrustedUrl(url) {
   return isDevelopment
@@ -59,6 +71,15 @@ function createMainWindow() {
 
   mainWindow.once('ready-to-show', () => mainWindow.show());
   mainWindow.removeMenu();
+  // Electron 37+ passe un objet, les versions précédentes des arguments séparés.
+  mainWindow.webContents.on('console-message', (event, level, message) => {
+    if (event && typeof event === 'object' && 'message' in event) recordRendererIssue(event);
+    else recordRendererIssue({ level: Number(level) >= 3 ? 'error' : 'warning', message });
+  });
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    recordRendererIssue({ level: 'error', message: `processus de rendu arrêté (${details?.reason || 'inconnu'})` });
+  });
+
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   mainWindow.webContents.on('will-navigate', (event, url) => {
     const allowed = isDevelopment
@@ -135,6 +156,7 @@ handleTrusted('report:save', async (_event, input) => {
     activeOutputs: outputs.map((output) => output.platform).join(', ') || 'aucune',
     description: input?.description,
     stderr,
+    rendererIssues: [...rendererIssues],
   });
 });
 handleTrusted('report:open-issue', (_event, input) => bugReporter.openIssue({

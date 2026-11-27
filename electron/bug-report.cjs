@@ -18,6 +18,9 @@ function redactIngestUrls(text) {
 function buildReport(input = {}) {
   const description = redactIngestUrls(String(input.description || '').slice(0, MAX_DESCRIPTION)).trim();
   const logs = Array.isArray(input.stderr) ? input.stderr.slice(-MAX_LOG_LINES).map((line) => redactIngestUrls(line)) : [];
+  const rendererIssues = Array.isArray(input.rendererIssues)
+    ? input.rendererIssues.slice(-10).map((line) => redactIngestUrls(String(line)))
+    : [];
   const lines = [
     'Rapport Camton Live',
     `Date : ${input.createdAt || new Date().toISOString()}`,
@@ -31,6 +34,9 @@ function buildReport(input = {}) {
     '',
     'Dernières lignes de l’encodeur (clés masquées) :',
     ...(logs.length ? logs : ['(aucune)']),
+    '',
+    'Erreurs de l’interface :',
+    ...(rendererIssues.length ? rendererIssues : ['(aucune)']),
     '',
   ];
   return lines.join('\n');
