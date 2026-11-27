@@ -8,4 +8,4 @@ jobs:
     uses: ./.github/workflows/release.yml
     with:
       tag: v0.5.3
-      target: b059bce5bc64d42a9553eb79f509ca240a3c6973
+      target: 92b3b1a5abcc7c9f7070b92b9821d59e326f030d
