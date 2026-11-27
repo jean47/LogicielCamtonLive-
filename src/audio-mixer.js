@@ -40,6 +40,7 @@ export class AudioMixer {
     this.masterAnalyser = null;
     this.destination = null;
     this.tracks = new Map();
+    this.elementSources = new WeakMap();
     this.masterVolume = 1;
     this.masterMuted = false;
   }
@@ -93,7 +94,13 @@ export class AudioMixer {
     if (!track || !element) return false;
     const context = await this.ensureContext();
     this.detach(id);
-    const source = context.createMediaElementSource(element);
+    // createMediaElementSource n'accepte qu'un nœud par élément : le recréer après une
+    // coupure lève InvalidStateError et la piste ne peut plus jamais être réactivée.
+    let source = this.elementSources.get(element);
+    if (!source) {
+      source = context.createMediaElementSource(element);
+      this.elementSources.set(element, source);
+    }
     return this.wireSource(track, source);
   }
 

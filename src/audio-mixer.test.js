@@ -206,3 +206,21 @@ test('dispose ferme le contexte et vide les pistes', async () => {
   assert.equal(mixer.context, null);
   assert.equal(closed, true);
 });
+
+test('une piste musique coupée puis réactivée réutilise le même nœud source', async () => {
+  const { mixer, context } = createMixer();
+  mixer.createTrack({ id: 'music', kind: 'music', volume: 0.6 });
+  const element = { pause() {}, currentTime: 0 };
+  let created = 0;
+  const original = context.createMediaElementSource;
+  context.createMediaElementSource = (target) => {
+    created += 1;
+    return original(target);
+  };
+  assert.equal(await mixer.attachElement('music', element), true);
+  mixer.detach('music');
+  assert.equal(mixer.tracks.get('music').inputNode, null);
+  assert.equal(await mixer.attachElement('music', element), true);
+  assert.equal(created, 1, 'createMediaElementSource ne doit être appelé qu’une fois');
+  assert.ok(mixer.tracks.get('music').inputNode, 'la piste est réarmée');
+});

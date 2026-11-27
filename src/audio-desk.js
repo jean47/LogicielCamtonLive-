@@ -162,7 +162,8 @@ export function createAudioDesk({ listElement, master, onStatus, onError, onToas
       track.element.pause();
       track.element.currentTime = 0;
     }
-    if (track.stream) {
+    // Le flux de la source porte aussi la vidéo de l'aperçu : l'arrêter ici le couperait.
+    if (track.stream && track.kind !== 'source') {
       track.stream.getTracks().forEach((item) => item.stop());
       track.stream = null;
     }
@@ -172,12 +173,29 @@ export function createAudioDesk({ listElement, master, onStatus, onError, onToas
 
   async function togglePower(track) {
     if (track.active) {
+      if (track.kind === 'source') {
+        mixer.detach(track.id);
+        track.active = false;
+        render();
+        return;
+      }
       stopCapture(track);
       render();
       return;
     }
     try {
-      if (track.kind === 'source') return;
+      if (track.kind === 'source') {
+        const stream = sourceStream;
+        if (!stream || !stream.getAudioTracks().some((item) => item.readyState === 'live')) {
+          onToast?.('Relance l’aperçu de la source pour retrouver son son.', 'warning');
+          render();
+          return;
+        }
+        track.active = await mixer.attachStream(track.id, stream).catch(() => false);
+        if (!track.active) onToast?.('Le son de la source n’a pas pu être rétabli. Relance l’aperçu.', 'warning');
+        render();
+        return;
+      }
       if (track.kind === 'music') await startMusic(track);
       else await startMic(track);
       render();
@@ -309,14 +327,16 @@ export function createAudioDesk({ listElement, master, onStatus, onError, onToas
       render();
     },
     async setSourceStream(stream) {
-      sourceStream = stream;
+      sourceStream = stream || null;
       const track = tracks.get('source');
       if (!track) return false;
       if (!stream || !stream.getAudioTracks().length) {
+        track.stream = null;
         stopCapture(track);
         render();
         return false;
       }
+      track.stream = stream;
       const attached = await mixer.attachStream(track.id, stream).catch(() => false);
       track.active = attached;
       render();
