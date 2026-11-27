@@ -1,0 +1,19 @@
+name: Sonde appelée (temporaire)
+on:
+  workflow_call:
+
+permissions:
+  contents: write
+
+jobs:
+  appele:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Jeton du job appelé
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "longueur GH_TOKEN=${#GH_TOKEN}"
+          curl -s -H "Authorization: Bearer ${GH_TOKEN}" "https://api.github.com/repos/${GITHUB_REPOSITORY}" | python3 -c "import json,sys; print('appelé:', json.load(sys.stdin).get('permissions'))"

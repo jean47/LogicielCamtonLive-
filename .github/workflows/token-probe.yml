@@ -1,0 +1,20 @@
+name: Sonde de permissions (temporaire)
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  direct:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Jeton du job direct
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "longueur GH_TOKEN=${#GH_TOKEN}"
+          curl -s -H "Authorization: Bearer ${GH_TOKEN}" "https://api.github.com/repos/${GITHUB_REPOSITORY}" | python3 -c "import json,sys; print('direct:', json.load(sys.stdin).get('permissions'))"
+
+  appele:
+    uses: ./.github/workflows/token-probe-called.yml
