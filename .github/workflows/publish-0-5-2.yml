@@ -41,7 +41,7 @@ jobs:
     uses: ./.github/workflows/release.yml
     with:
       tag: v0.5.2
-      target: f2ea58b677b9edbe653817a51b9cc5dc984b051f
+      target: 9cf80e5aca81de986d0969126d7e9ff69f68cd40
 
   # Job direct : seul un workflow non réutilisable peut créer le tag de la release.
   publier:
@@ -58,4 +58,4 @@ jobs:
       - uses: ./.github/actions/publier-release
         with:
           tag: v0.5.2
-          target: f2ea58b677b9edbe653817a51b9cc5dc984b051f
+          target: 9cf80e5aca81de986d0969126d7e9ff69f68cd40
