@@ -1,9 +1,8 @@
 {
-  "version": "0.5.11",
+  "version": "0.5.12",
   "notes": [
-    "La piste « Sortie du PC » accepte maintenant n’importe quelle entrée audio : dans sa liste, garde « Sortie du PC (sortie par défaut) », ou choisis une entrée du PC — Mixage stéréo, entrée ligne, carte de capture.",
-    "Le choix est mémorisé et la piste se rallume avec le même appareil au démarrage suivant.",
-    "Si la sortie par défaut reste muette : Paramètres Windows → Son → Enregistrement → clic droit → « Afficher les appareils désactivés » → activer « Mixage stéréo », puis le choisir dans Camton Live.",
+    "Quand une piste n’arrive pas à s’allumer, la raison s’affiche sous son nom : aucun écran détecté, capture refusée, Windows n’a livré aucun son, entrée indisponible.",
+    "Plus de bouton qui reste sans réponse : le message reste visible tant que la piste n’est pas allumée.",
     "Camton Live reste en bêta jusqu’à la version 1.0.0."
   ]
 }

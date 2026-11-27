@@ -55,6 +55,7 @@ function trackMarkup(track, config, devices, removable, anySolo, hint) {
       <div class="track-id">
         <strong>${config.label}</strong>
         ${subtitle}
+        ${track.error ? `<small class="track-hint track-hint--warning">${track.error}</small>` : ''}
         ${deviceLabel ? `<span class="track-device-name">${deviceLabel}</span>` : ''}
       </div>
       <div class="track-signal">
@@ -194,21 +195,26 @@ export function createAudioDesk({ listElement, master, onStatus, onError, onToas
         .getUserMedia({ audio: { deviceId: { exact: track.deviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false } })
         .catch(() => null);
       if (!stream) {
-        onToast?.('Cette entrée audio n’a pas pu être ouverte. Choisis-en une autre.', 'warning');
+        track.error = 'Cette entrée audio n’a pas pu être ouverte. Choisis-en une autre.';
+        onToast?.(track.error, 'warning');
         return false;
       }
+      track.error = '';
       return attachDesktopStream(track, stream);
     }
     if (!onCaptureDesktopAudio) {
-      onToast?.('La capture de la sortie du PC est disponible dans l’application de bureau.', 'warning');
+      track.error = 'La capture de la sortie du PC est disponible dans l’application de bureau.';
+      onToast?.(track.error, 'warning');
       return false;
     }
-    const stream = await onCaptureDesktopAudio().catch(() => null);
-    if (!stream || !stream.getAudioTracks().length) {
-      onToast?.('Aucune sortie audio du PC n’a pu être captée. Choisis une entrée dans la liste, ou active « Mixage stéréo » dans Windows.', 'warning');
+    const result = await onCaptureDesktopAudio().catch((error) => ({ error: `La capture a échoué (${error?.message || 'erreur'}).` }));
+    if (!result?.stream) {
+      track.error = result?.error || 'Aucune sortie audio du PC n’a pu être captée.';
+      onToast?.(track.error, 'warning');
       return false;
     }
-    return attachDesktopStream(track, stream);
+    track.error = '';
+    return attachDesktopStream(track, result.stream);
   }
 
   async function attachDesktopStream(track, stream) {
@@ -229,6 +235,7 @@ export function createAudioDesk({ listElement, master, onStatus, onError, onToas
   }
 
   function stopCapture(track) {
+    track.error = '';
     if (track.element) {
       track.element.pause();
       track.element.currentTime = 0;

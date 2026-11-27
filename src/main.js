@@ -80,8 +80,29 @@ const audioDesk = createAudioDesk({
 // vidéo à 5 images/s : on la garde vivante, la couper interrompt le son système
 // sur certaines configurations Windows. Seul l'audio entre dans la table.
 async function captureDesktopAudio() {
-  if (!desktop?.isDesktopApp) return null;
-  return captureLoopbackAudio();
+  if (!desktop?.isDesktopApp) return { error: 'Capture disponible dans l’application de bureau seulement.' };
+  let sources = [];
+  try {
+    sources = await desktop.listCaptureSources();
+  } catch {
+    return { error: 'La liste des écrans n’a pas pu être lue.' };
+  }
+  const screen = sources.find((item) => String(item.id).startsWith('screen:'));
+  if (!screen) return { error: `Aucun écran détecté (${sources.length} source(s) vue(s)).` };
+  await desktop.selectCaptureSource(screen.id);
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 5, max: 10 } }, audio: true });
+  } catch (error) {
+    return { error: `La capture d’écran a été refusée (${error?.name || 'erreur'}).` };
+  }
+  if (!stream.getAudioTracks().length) {
+    stopTracks(stream);
+    const inputs = (await navigator.mediaDevices.enumerateDevices().catch(() => []))
+      .filter((device) => device.kind === 'audioinput').length;
+    return { error: `Windows n’a livré aucun son avec l’écran (${inputs} entrée(s) audio vue(s)).` };
+  }
+  return { stream };
 }
 
 const SEEN_VERSION_KEY = 'camton-seen-version';
