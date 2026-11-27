@@ -20,7 +20,7 @@ if [ -n "$target" ] && ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}"
     -f ref="refs/tags/${tag}" -f sha="${target}" >/dev/null
 fi
 
-mapfile -t fichiers < <(find "$dossier" -maxdepth 1 -type f | sort)
+mapfile -t fichiers < <(find "$dossier" -type f | sort)
 if [ "${#fichiers[@]}" -eq 0 ]; then
   echo "::error::Aucun fichier à joindre dans ${dossier}"
   exit 1

@@ -103,7 +103,7 @@ jobs:
   # ignoré et c'est le workflow appelant qui publie.
   publier:
     needs: windows
-    if: github.event_name != 'workflow_call'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write

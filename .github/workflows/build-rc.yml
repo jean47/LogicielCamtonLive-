@@ -30,7 +30,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           ls -lh release-files
-          gh release create v0.5.2-rc.1 release-files/* \
+          mapfile -t fichiers < <(find release-files -type f | sort)
+          gh release create v0.5.2-rc.1 "${fichiers[@]}" \
             --title "Camton Live 0.5.2 — build de test" \
             --prerelease \
             --notes "Build de test, hors calendrier de publication. Contient le correctif d'installation."
