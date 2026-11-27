@@ -1205,3 +1205,15 @@ select:hover { border-color: #514680; }
 
 .track-hint { color: var(--text-muted); }
 .track-hint--warning { color: var(--gold-soft); }
+
+.track-tools { display: inline-flex; gap: 6px; margin-top: 6px; }
+.track-test {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 9px;
+}
+.track-test:hover { border-color: var(--gold-soft); color: var(--text); }

@@ -1,4 +1,5 @@
 import { AudioMixer, TRACK_KINDS, clampVolume, levelPercent } from './audio-mixer.js';
+import { listLineInputs, openLineInput, watchSignal } from './audio-line-input.js';
 
 const STORAGE_KEY = 'camton-mixer';
 const MIC_KINDS = new Set(['mic', 'mic2']);
@@ -34,7 +35,11 @@ export function describeSourceCapture(stream, track = null) {
 function trackMarkup(track, config, devices, removable, anySolo, hint) {
   const device = devices.find((item) => item.deviceId === track.deviceId);
   const deviceOptions = devices
-    .map((item, index) => `<option value="${item.deviceId}"${item.deviceId === track.deviceId ? ' selected' : ''}>${item.label || `Entrée ${index + 1}`}</option>`)
+    .map((item, index) => {
+      const name = item.label || `Entrée ${index + 1}`;
+      const cable = item.likelyCable ? ' — câble virtuel' : '';
+      return `<option value="${item.deviceId}"${item.deviceId === track.deviceId ? ' selected' : ''}>${name}${cable}</option>`;
+    })
     .join('');
   const subtitle = MIC_KINDS.has(track.kind)
     ? `<select class="track-device" data-role="device" aria-label="Microphone de ${config.label}">
@@ -45,7 +50,11 @@ function trackMarkup(track, config, devices, removable, anySolo, hint) {
       ? `<select class="track-device" data-role="device" aria-label="Entrée audio de ${config.label}">
            <option value="">Sortie du PC (sortie par défaut)</option>
            ${deviceOptions}
-         </select>`
+         </select>
+         <span class="track-tools">
+           <button class="track-test" data-action="test" type="button" title="Écouter cette entrée quatre secondes">Tester</button>
+           <button class="track-test" data-action="wiring" type="button" title="Comment brancher le son du PC">Câblage</button>
+         </span>`
       : `<small${hint?.warning ? ' class="track-hint track-hint--warning"' : ' class="track-hint"'}>${hint?.label || track.file?.name || config.hint}</small>`;
   const deviceLabel = device?.label || '';
   return `
@@ -69,7 +78,7 @@ function trackMarkup(track, config, devices, removable, anySolo, hint) {
     </li>`;
 }
 
-export function createAudioDesk({ listElement, master, onStatus, onError, onToast, onRequestSource, onCaptureDesktopAudio } = {}) {
+export function createAudioDesk({ listElement, master, onStatus, onError, onToast, onRequestSource, onCaptureDesktopAudio, onShowWiring } = {}) {
   const mixer = new AudioMixer();
   const settings = readSettings();
   const tracks = new Map();
@@ -147,8 +156,7 @@ export function createAudioDesk({ listElement, master, onStatus, onError, onToas
   async function refreshDevices() {
     if (!navigator.mediaDevices?.enumerateDevices) return;
     try {
-      const all = await navigator.mediaDevices.enumerateDevices();
-      devices = all.filter((device) => device.kind === 'audioinput');
+      devices = await listLineInputs();
     } catch {
       devices = [];
     }
@@ -191,16 +199,15 @@ export function createAudioDesk({ listElement, master, onStatus, onError, onToas
   // Audio » d'OBS, sans dépendre de ce que l'aperçu montre.
   async function startDesktopAudio(track) {
     if (track.deviceId) {
-      const stream = await navigator.mediaDevices
-        .getUserMedia({ audio: { deviceId: { exact: track.deviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false } })
-        .catch(() => null);
-      if (!stream) {
-        track.error = 'Cette entrée audio n’a pas pu être ouverte. Choisis-en une autre.';
+      try {
+        const line = await openLineInput(track.deviceId);
+        track.error = line.processingActive ? 'Traitement micro encore actif : le son peut être déformé.' : '';
+        return attachDesktopStream(track, line.stream);
+      } catch (error) {
+        track.error = error?.message || 'Cette entrée audio n’a pas pu être ouverte.';
         onToast?.(track.error, 'warning');
         return false;
       }
-      track.error = '';
-      return attachDesktopStream(track, stream);
     }
     if (!onCaptureDesktopAudio) {
       track.error = 'La capture de la sortie du PC est disponible dans l’application de bureau.';
@@ -247,6 +254,30 @@ export function createAudioDesk({ listElement, master, onStatus, onError, onToas
     }
     mixer.detach(track.id);
     track.active = false;
+  }
+
+  // Quatre secondes d’écoute : dit si du son arrive vraiment sur l’entrée choisie.
+  async function testTrack(track) {
+    const [audio] = track.stream?.getAudioTracks() || [];
+    if (!audio) {
+      onToast?.('Allume d’abord la piste, puis clique sur Tester.', 'warning');
+      return;
+    }
+    onToast?.('Test en cours : joue un son pendant quatre secondes.', 'info');
+    const probe = await mixer.ensureContext().then((context) => ({
+      createMediaStreamSource: (stream) => context.createMediaStreamSource(stream),
+      createAnalyser: () => context.createAnalyser(),
+      close: () => {},
+    })).catch(() => null);
+    const result = await watchSignal(audio, probe ? { createContext: () => probe } : {}).catch(() => null);
+    if (!result) {
+      onToast?.('Le test n’a pas pu se faire sur cette entrée.', 'warning');
+      return;
+    }
+    onToast?.(
+      result.hasSignal ? 'Du son arrive sur cette entrée.' : 'Aucun son sur cette entrée : Windows n’envoie rien ici.',
+      result.hasSignal ? 'success' : 'warning',
+    );
   }
 
   async function togglePower(track) {
@@ -298,6 +329,8 @@ export function createAudioDesk({ listElement, master, onStatus, onError, onToas
       const track = tracks.get(row.dataset.trackId);
       if (!track) return;
       if (button.dataset.action === 'power') return void togglePower(track);
+      if (button.dataset.action === 'test') return void testTrack(track);
+      if (button.dataset.action === 'wiring') return void onShowWiring?.();
       if (button.dataset.action === 'mute') {
         track.muted = !track.muted;
         mixer.setMuted(track.id, track.muted);

@@ -1,6 +1,7 @@
 import { LIVE_PROFILES, PLATFORM_DETAILS, PLATFORM_IDS, captureConstraints } from './platforms.js';
 import { createCompositor } from './compositor.js';
 import { createAudioDesk } from './audio-desk.js';
+import { WIRING_STEPS } from './audio-line-input.js';
 import releaseNotes from './release-notes.json';
 import { parseNotes, shouldAnnounce } from './whats-new.js';
 import { isNewerVersion } from './version.js';
@@ -74,6 +75,13 @@ const audioDesk = createAudioDesk({
   // Le son de la source ne se rétablit pas sans une capture : on rouvre le sélecteur.
   onRequestSource: () => $('#capturePcBtn')?.click(),
   onCaptureDesktopAudio: captureDesktopAudio,
+  onShowWiring: () => showModal({
+    title: 'Brancher le son du PC',
+    eyebrow: 'CÂBLAGE',
+    body: 'La sortie par défaut de Windows ne suffit pas toujours. Un câble audio virtuel règle le problème une fois pour toutes.',
+    items: [...WIRING_STEPS],
+    mark: '!',
+  }),
 });
 
 // Sortie par défaut du PC, capturée pour elle-même. La capture porte aussi une

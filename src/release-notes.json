@@ -1,8 +1,9 @@
 {
-  "version": "0.5.12",
+  "version": "0.5.13",
   "notes": [
-    "Quand une piste n’arrive pas à s’allumer, la raison s’affiche sous son nom : aucun écran détecté, capture refusée, Windows n’a livré aucun son, entrée indisponible.",
-    "Plus de bouton qui reste sans réponse : le message reste visible tant que la piste n’est pas allumée.",
+    "La piste « Sortie du PC » liste d’abord les câbles virtuels (VB-Cable, Voicemeeter) et le Mixage stéréo, signalés comme tels.",
+    "Ces entrées s’ouvrent sans réduction de bruit, sans annulation d’écho et sans gain automatique : la musique et le son du jeu ne sont plus déformés.",
+    "Deux boutons sur la piste : « Tester » écoute quatre secondes et dit si du son arrive vraiment ; « Câblage » affiche la marche à suivre pas à pas.",
     "Camton Live reste en bêta jusqu’à la version 1.0.0."
   ]
 }

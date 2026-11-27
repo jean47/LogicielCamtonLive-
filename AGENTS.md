@@ -54,6 +54,7 @@ npm run desktop:win    # ffmpeg:fetch + build + electron-builder (ZIP portable)
 
 - `src/audio-mixer.js` : graphe Web Audio et logique pure (`resolveTrackGains`, `clampVolume`, `levelPercent`). Un seul `AudioContext` pour toute l’application ; ne pas recréer un contexte par vu-mètre.
 - `src/audio-desk.js` : pistes, interface, capture micro/musique et persistance (`localStorage` → `camton-mixer`).
+- `src/audio-line-input.js` : entrées « ligne » (câble virtuel, Mixage stéréo) sans traitement micro, test de signal 4 s et guide de câblage. Fonctions pures, testables sous Node.
 - Piste `desktop` (« Sortie du PC ») : capture de la sortie audio par défaut via `onCaptureDesktopAudio` (loopback), indépendante de la source vidéo et du direct — `releaseCaptures()` la laisse allumée.
 - `main.js` ne fait que relayer : `setSourceStream()` à l’aperçu, `ensurePrimaryMic()` + `getOutputStream()` au démarrage du direct, `releaseCaptures()` à l’arrêt.
 
