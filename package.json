@@ -20,6 +20,7 @@
   "build": {
     "appId": "fr.camtonlive.desktop",
     "productName": "Camton Live",
+    "afterPack": "scripts/after-pack.cjs",
     "copyright": "Copyright © 2026 Camton Live contributors",
     "directories": {
       "output": "release",

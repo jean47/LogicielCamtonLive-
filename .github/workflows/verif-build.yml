@@ -1,0 +1,11 @@
+name: Vérification du build (temporaire)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: v0.5.3
+      target: b059bce5bc64d42a9553eb79f509ca240a3c6973

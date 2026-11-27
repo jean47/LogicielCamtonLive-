@@ -70,6 +70,23 @@ jobs:
       - name: Installer NSIS
         run: choco install nsis --yes --no-progress
 
+      # Sans secret, l'étape ne fait rien : la release part non signée, comme avant.
+      # Avec WINDOWS_CERT_PFX (le .pfx en base64) et WINDOWS_CERT_PASSWORD, les trois
+      # binaires sont signés dans le bon ordre par scripts/sign-windows.mjs.
+      - name: Préparer le certificat de signature
+        shell: bash
+        env:
+          PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX }}
+          PFX_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          if [ -z "$PFX_BASE64" ]; then
+            echo "Aucun certificat configuré : la release partira non signée."
+            exit 0
+          fi
+          echo "$PFX_BASE64" | base64 --decode > "$RUNNER_TEMP/camton.pfx"
+          echo "WINDOWS_CERT_PFX_PATH=$RUNNER_TEMP/camton.pfx" >> "$GITHUB_ENV"
+          echo "WINDOWS_CERT_PASSWORD=$PFX_PASSWORD" >> "$GITHUB_ENV"
+
       - name: Construire l’interface
         run: npm run build
 
@@ -81,6 +98,16 @@ jobs:
         run: |
           npx electron-builder --win zip --x64
           node scripts/build-installer.mjs
+
+      - name: Vérifier la signature des binaires
+        if: env.WINDOWS_CERT_PFX_PATH != ''
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          node scripts/sign-windows.mjs --verify \
+            "release/Camton-Live-Setup-${version}-x64.exe" \
+            "release/win-unpacked/Camton Live.exe" \
+            "release/win-unpacked/resources/ffmpeg/bin/ffmpeg.exe"
 
       - name: Préparer le manifeste (empreinte et nouveautés)
         env:

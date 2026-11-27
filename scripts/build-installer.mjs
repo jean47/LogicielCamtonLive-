@@ -61,5 +61,9 @@ const env = process.platform === 'win32' ? process.env : { ...process.env, NSISD
 console.log(`Compilation de l’installateur ${version} avec ${makensis}…`);
 execFileSync(makensis, ['-V2', `-DVERSION=${version}`, `-DOUT=${output}`, 'installer/setup.nsi'], { cwd: ROOT, stdio: 'inherit', env });
 
+// Dernier binaire produit : il doit être signé après makensis, jamais avant.
+const { signFiles } = await import('./sign-windows.mjs');
+signFiles([output]);
+
 const megaBytes = (statSync(output).size / 1024 / 1024).toFixed(1);
 console.log(`Installateur prêt : ${path.relative(ROOT, output)} (${megaBytes} Mo)`);

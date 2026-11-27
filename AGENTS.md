@@ -63,6 +63,15 @@ npm run desktop:win    # ffmpeg:fetch + build + electron-builder (ZIP portable)
 - `docs/guide-destinations.md` et `docs/faq.md` sont les versions publiables du guide (« où trouver quoi » pour Twitch, YouTube, TikTok) et de la FAQ. L’application embarque le même contenu dans `openGuide()` / `openFaq()` : toute correction doit être reportée aux deux endroits.
 - Destinations : `twitch` (clé seule), `youtube`, `tiktok` et `relay` (adresse RTMP(S) + clé). Le relais est une sortie générique vers Restream, Streamlabs ou un serveur RTMP personnel : même chemin que TikTok, sans validation d’hôte. Une destination se déclare dans `src/platforms.js`, `index.html` (carte), `electron/secret-store.cjs` (`SUPPORTED` + validation) et `electron/stream-engine.cjs` (`destinationFor` + liste blanche). La clé TikTok est liée à une session : elle est recopiée à chaque direct.
 
+## Signature Windows
+
+- Tout binaire distribué est signé quand un certificat est configuré, et le build reste identique sans certificat : `scripts/sign-windows.mjs` ne fait rien si `WINDOWS_CERT_PFX_PATH` / `WINDOWS_CERT_PFX_BASE64` sont absents.
+- Trois binaires, dans cet ordre : `Camton Live.exe` et `ffmpeg.exe` via le point d'entrée `afterPack` d'electron-builder (donc **avant** le ZIP), puis `Camton-Live-Setup-<version>-x64.exe` à la fin de `scripts/build-installer.mjs`. Signer après la fabrication de l'archive ne signe rien.
+- Secrets GitHub attendus : `WINDOWS_CERT_PFX` (le `.pfx` encodé en base64) et `WINDOWS_CERT_PASSWORD`. `signtool.exe` vient du SDK Windows, présent sur `windows-latest` ; sinon `SIGNTOOL=/chemin/vers/signtool.exe`.
+- Horodatage RFC 3161 obligatoire (`/tr`), sinon la signature meurt avec le certificat.
+- C'est la réputation du **certificat** qui fait taire SmartScreen, pas le fichier : garder le même certificat d'une version à l'autre. Un certificat EV vaut confiance immédiate, un OV se construit par téléchargements.
+- Alternative sans token matériel : Azure Artifact Signing (ex-Trusted Signing), réservé aux organisations de l'UE, du Royaume-Uni, des États-Unis, du Canada, de l'Australie, de la Nouvelle-Zélande, du Japon, de la Corée du Sud, de Singapour, de la Suisse, de la Norvège et d'Israël ; un particulier n'y est éligible qu'aux États-Unis ou au Canada. La CI n'est pas câblée pour cette voie : il faudrait remplacer `signtool sign /f` par `signtool sign /dlib /dmdf`.
+
 ## Installateur Windows
 
 - `installer/setup.nsi` + `scripts/build-installer.mjs` remplacent la cible `nsis` d’electron-builder, qui exige Wine sous Linux. `makensis` s’exécute nativement ; sous Linux il faut exporter `NSISDIR` vers la racine de la distribution (fait par le script).
