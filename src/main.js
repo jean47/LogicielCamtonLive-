@@ -1,4 +1,4 @@
-import { LIVE_PROFILES, PLATFORM_DETAILS, PLATFORM_IDS } from './platforms.js';
+import { LIVE_PROFILES, PLATFORM_DETAILS, PLATFORM_IDS, captureConstraints } from './platforms.js';
 import { createCompositor } from './compositor.js';
 import { createAudioDesk } from './audio-desk.js';
 import releaseNotes from './release-notes.json';
@@ -1536,12 +1536,10 @@ async function captureLoopbackAudio() {
 async function startDesktopCapture(source) {
   try {
     let stream;
+    const profile = LIVE_PROFILES[state.quality] || LIVE_PROFILES.balanced;
     const capture = async (audio) => {
       await desktop.selectCaptureSource(source.id);
-      return navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: { ideal: 30, max: 60 } },
-        audio,
-      });
+      return navigator.mediaDevices.getDisplayMedia({ ...captureConstraints(profile.fps), audio });
     };
     try {
       stream = await capture(true);
@@ -1634,7 +1632,8 @@ function init() {
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30, max: 60 } }, audio: true });
+      const profile = LIVE_PROFILES[state.quality] || LIVE_PROFILES.balanced;
+      const stream = await navigator.mediaDevices.getDisplayMedia(captureConstraints(profile.fps));
       await startPreview(stream, 'Écran / fenêtre PC');
     } catch (error) {
       if (error?.name !== 'AbortError') showMediaError(error, 'l’écran ou la fenêtre');

@@ -5,6 +5,11 @@ export const TRACK_KINDS = {
   music: { label: 'Musique', hint: 'Fichier audio local', volume: 0.6, icon: '♪', removable: true },
 };
 
+// 48 kHz comme le son système et l'encodeur AAC : plus de rééchantillonnage dans la
+// chaîne. « playback » donne un tampon large, donc moins de coupures quand le
+// rendu vidéo occupe la machine.
+export const AUDIO_CONTEXT_OPTIONS = Object.freeze({ sampleRate: 48000, latencyHint: 'playback' });
+
 export function clampVolume(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return 0;
@@ -33,7 +38,8 @@ export function levelPercent(rms) {
 
 export class AudioMixer {
   constructor({ createContext, createStream } = {}) {
-    this.createContext = createContext || (() => new (window.AudioContext || window.webkitAudioContext)());
+    this.createContext = createContext
+      || (() => new (window.AudioContext || window.webkitAudioContext)(AUDIO_CONTEXT_OPTIONS));
     this.createStream = createStream || ((tracks) => new MediaStream(tracks));
     this.context = null;
     this.master = null;

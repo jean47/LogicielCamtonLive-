@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { AudioMixer, TRACK_KINDS, clampVolume, levelPercent, resolveTrackGains } from './audio-mixer.js';
+import { AUDIO_CONTEXT_OPTIONS, AudioMixer, TRACK_KINDS, clampVolume, levelPercent, resolveTrackGains } from './audio-mixer.js';
 
 // AudioContext factice : même contrat que l’API Web Audio, sans navigateur.
 function createStubContext() {
@@ -242,4 +242,9 @@ test('une piste musique coupée puis réactivée réutilise le même nœud sourc
   assert.equal(await mixer.attachElement('music', element), true);
   assert.equal(created, 1, 'createMediaElementSource ne doit être appelé qu’une fois');
   assert.ok(mixer.tracks.get('music').inputNode, 'la piste est réarmée');
+});
+
+test('le contexte audio tourne en 48 kHz avec un tampon large', async () => {
+  assert.equal(AUDIO_CONTEXT_OPTIONS.sampleRate, 48000);
+  assert.equal(AUDIO_CONTEXT_OPTIONS.latencyHint, 'playback');
 });

@@ -1,11 +1,10 @@
 {
-  "version": "0.5.2",
+  "version": "0.5.3",
   "notes": [
-    "TikTok par clé de flux et sortie relais RTMP : deux destinations de plus, dont une qui répartit un seul flux vers TikTok ou YouTube.",
-    "Supervision des sorties : chaque destination affiche son débit réel, ses images par seconde et les images perdues, au lieu du seul « Encodage actif ».",
-    "Test de débit montant : une mesure de quelques secondes dit si le préréglage choisi passe, avec de la marge ou pas du tout.",
-    "Quatre destinations au lieu de deux. Au-delà de deux, l’application rappelle qu’un relais consomme moins de bande montante.",
-    "Signaler un problème : un rapport local part sur ton Bureau, clés masquées, et une issue GitHub préremplie s’ouvre. Rien ne part sans ton clic.",
+    "Le son de la source ne grésille plus : l’aperçu est capturé au plus en 1080p, et le rendu vidéo ne prend plus les ressources dont l’audio a besoin.",
+    "Le profil « Très net » demande vraiment 60 images par seconde à la capture. Il en demandait 30, la cadence était ensuite doublée à l’encodage.",
+    "Mixage en 48 kHz avec un tampon large et limiteur en sortie : plus de rééchantillonnage, plus d’écrêtage quand plusieurs pistes parlent ensemble.",
+    "L’encodeur vidéo est testé à la résolution du profil choisi, pas en 360p : un encodeur qui ne tient pas le 1080p60 n’est plus retenu.",
     "Camton Live reste en bêta jusqu’à la version 1.0.0."
   ]
 }

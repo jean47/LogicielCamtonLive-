@@ -4,6 +4,22 @@ export const LIVE_PROFILES = Object.freeze({
   sharp: Object.freeze({ width: 1920, height: 1080, fps: 60, bitrate: 6000, label: 'Très net' }),
 });
 
+// La capture est bornée au 1080p et à la cadence du profil. Encoder une source 4K
+// dans l'aperçu coûtait plus que l'encodage final et affamait le thread audio.
+export const CAPTURE_LIMITS = Object.freeze({ width: 1920, height: 1080 });
+
+export function captureConstraints(fps = 60) {
+  const rate = Number.isFinite(fps) && fps > 0 ? Math.round(fps) : 60;
+  return {
+    video: {
+      frameRate: { ideal: rate, max: rate },
+      width: { max: CAPTURE_LIMITS.width },
+      height: { max: CAPTURE_LIMITS.height },
+    },
+    audio: true,
+  };
+}
+
 export const PLATFORM_DETAILS = Object.freeze({
   youtube: Object.freeze({
     name: 'YouTube',
