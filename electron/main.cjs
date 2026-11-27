@@ -169,13 +169,26 @@ handleTrusted('updates:download', () => updateService.download());
 handleTrusted('updates:install', () => updateService.install());
 handleTrusted('updates:reveal-installer', () => updateService.revealInstaller());
 
+// Un direct ou un enregistrement en cours interdit toute mise à jour : elle
+// fermerait l'application au milieu d'une capture.
+function isBusy() {
+  return Boolean(streamEngine?.isActive()) || Boolean(recorder?.isRecording());
+}
+
 app.whenReady().then(() => {
   secretStore = createSecretStore({ app, safeStorage });
   streamEngine = createStreamEngine({ app, emit: emitStreamStatus });
   updateService = createUpdateService({
     app,
-    emit: emitUpdateState,
-    getIsStreaming: () => streamEngine?.isActive() || false,
+    emit: (state) => {
+      emitUpdateState(state);
+      // Téléchargement automatique : l'utilisateur n'a plus rien à cliquer, seule
+      // l'installation au prochain démarrage reste, et elle est silencieuse aussi.
+      if (state.status === 'available' && !isBusy()) {
+        updateService.download().catch(() => {});
+      }
+    },
+    getIsStreaming: () => isBusy(),
     revealInFolder: (filePath) => shell.showItemInFolder(filePath),
   });
   recorder = createRecorder({ app, emit: emitRecordingState });
@@ -194,6 +207,20 @@ app.whenReady().then(() => {
 
   createMainWindow();
   const updateCheckTimer = setTimeout(() => updateService.check(), 5000);
+  // Installateur déjà téléchargé et vérifié : on l'applique au démarrage, sans
+  // demande. L'installateur relance lui-même l'application, donc l'utilisateur
+  // retrouve Camton Live en nouvelle version. Un échec précédent est respecté :
+  // dans ce cas la bannière propose de réessayer à la main.
+  const autoInstallTimer = setTimeout(async () => {
+    const snapshot = updateService.getState();
+    if (snapshot.status !== 'downloaded' || snapshot.lastInstallFailed || isBusy()) return;
+    try {
+      await updateService.install();
+    } catch {
+      // La bannière reste disponible avec le bouton d'installation.
+    }
+  }, 8000);
+  autoInstallTimer.unref?.();
   // Une vérification ratée au démarrage ne doit pas condamner la session entière :
   // on repasse toutes les six heures, sans toucher à un téléchargement en cours.
   const updatePollTimer = setInterval(() => {

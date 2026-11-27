@@ -1,10 +1,9 @@
 {
-  "version": "0.5.5",
+  "version": "0.5.6",
   "notes": [
-    "La mise à jour ne peut plus s’installer à moitié : si l’ancienne version résiste encore, l’installateur échoue franchement au lieu de copier une partie des fichiers.",
-    "Camton Live se relance tout seul après la mise à jour, et aussi quand elle échoue, pour en afficher la raison.",
-    "La pastille de version, en haut à droite, vérifie les mises à jour d’un clic. Après une mise à jour, un message confirme la version installée.",
-    "La vérification repasse toutes les six heures, au lieu d’une seule fois au démarrage.",
+    "Mise à jour automatique : Camton Live télécharge la nouvelle version en arrière-plan, puis l’installe à son prochain démarrage. Plus rien à cliquer.",
+    "Aucune mise à jour ne s’installe pendant un direct ou un enregistrement : elle attend que ce soit fini.",
+    "La pastille de version vérifie toujours les mises à jour d’un clic, et la bannière permet d’installer tout de suite si tu préfères.",
     "Camton Live reste en bêta jusqu’à la version 1.0.0."
   ]
 }

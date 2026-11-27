@@ -63,6 +63,12 @@ npm run desktop:win    # ffmpeg:fetch + build + electron-builder (ZIP portable)
 - `docs/guide-destinations.md` et `docs/faq.md` sont les versions publiables du guide (« où trouver quoi » pour Twitch, YouTube, TikTok) et de la FAQ. L’application embarque le même contenu dans `openGuide()` / `openFaq()` : toute correction doit être reportée aux deux endroits.
 - Destinations : `twitch` (clé seule), `youtube`, `tiktok` et `relay` (adresse RTMP(S) + clé). Le relais est une sortie générique vers Restream, Streamlabs ou un serveur RTMP personnel : même chemin que TikTok, sans validation d’hôte. Une destination se déclare dans `src/platforms.js`, `index.html` (carte), `electron/secret-store.cjs` (`SUPPORTED` + validation) et `electron/stream-engine.cjs` (`destinationFor` + liste blanche). La clé TikTok est liée à une session : elle est recopiée à chaque direct.
 
+## Mises à jour
+
+- `electron/update-service.cjs` : manifeste HTTPS, empreinte SHA-256, installation par script PowerShell qui attend la fermeture de l'application.
+- Automatique depuis la 0.5.6 : le téléchargement démarre dès qu'une version est annoncée, et l'installateur déjà vérifié s'applique au démarrage suivant (8 s après l'ouverture). `isBusy()` (direct ou enregistrement) bloque les deux.
+- Un échec d'installation est journalisé dans `%APPDATA%\Camton Live\updates\install-log.txt` et n'est jamais réessayé automatiquement : la bannière propose le clic.
+
 ## Signature Windows
 
 - Tout binaire distribué est signé quand un certificat est configuré, et le build reste identique sans certificat : `scripts/sign-windows.mjs` ne fait rien si `WINDOWS_CERT_PFX_PATH` / `WINDOWS_CERT_PFX_BASE64` sont absents.
