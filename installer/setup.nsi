@@ -37,6 +37,8 @@ VIAddVersionKey "CompanyName" "${PUBLISHER}"
 VIAddVersionKey "Comments" "Installateur par utilisateur, sans droits administrateur"
 
 !include "MUI2.nsh"
+!include "StrFunc.nsh"
+${StrStr}
 !include "LogicLib.nsh"
 !include "FileFunc.nsh"
 
@@ -120,10 +122,14 @@ Section "Application" SecApp
 
   ; En mise à jour silencieuse, personne ne relance l'application : sans cela
   ; l'utilisateur reste devant une fenêtre fermée et croit que rien ne s'est passé.
+  ; /CAMTON_QUIT : mise à jour appliquée à la fermeture de l'application, personne
+  ; n'attend de relance. Sans ce drapeau, la relance reste le comportement par défaut.
   FileOpen $2 "$INSTDIR\version-installee.txt" w
   FileWrite $2 "${VERSION}$\r$\n"
   FileClose $2
   IfSilent 0 camton_fin
+  ${StrStr} $0 $CMDLINE "/CAMTON_QUIT"
+  StrCmp $0 "" 0 camton_fin
   Exec '"$INSTDIR\${APP_EXE}"'
   camton_fin:
 SectionEnd

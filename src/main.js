@@ -148,7 +148,7 @@ function renderUpdateNotice(update = state.updateStatus) {
       ? 'Le fichier est vérifié. Arrête ton direct pour pouvoir l’installer sans interruption.'
       : echec
         ? 'La dernière installation n’a pas abouti. Réessaie, ou ouvre le dossier et lance le fichier à la main.'
-        : 'Le fichier est vérifié. L’installation se fera toute seule au prochain démarrage, ou tout de suite si tu cliques.';
+        : 'Le fichier est vérifié. Il s’installe quand tu fermes Camton Live, ou tout de suite si tu cliques.';
     action.textContent = state.isStreaming ? 'Arrête le direct pour installer' : 'Installer maintenant';
     action.disabled = state.isStreaming;
   } else if (status === 'installing') {

@@ -237,20 +237,6 @@ app.whenReady().then(() => {
 
   createMainWindow();
   const updateCheckTimer = setTimeout(() => updateService.check(), 5000);
-  // Installateur déjà téléchargé et vérifié : on l'applique au démarrage, sans
-  // demande. L'installateur relance lui-même l'application, donc l'utilisateur
-  // retrouve Camton Live en nouvelle version. Un échec précédent est respecté :
-  // dans ce cas la bannière propose de réessayer à la main.
-  const autoInstallTimer = setTimeout(async () => {
-    const snapshot = updateService.getState();
-    if (snapshot.status !== 'downloaded' || snapshot.lastInstallFailed || isBusy()) return;
-    try {
-      await updateService.install();
-    } catch {
-      // La bannière reste disponible avec le bouton d'installation.
-    }
-  }, 8000);
-  autoInstallTimer.unref?.();
   // Une vérification ratée au démarrage ne doit pas condamner la session entière :
   // on repasse toutes les six heures, sans toucher à un téléchargement en cours.
   const updatePollTimer = setInterval(() => {
@@ -264,16 +250,31 @@ app.whenReady().then(() => {
   });
 });
 
+let quitUpdateStarted = false;
+
 app.on('before-quit', (event) => {
+  if (quitUpdateStarted) return;
   const streaming = streamEngine?.isActive();
   const recording = recorder?.isRecording();
-  if (!isQuitting && (streaming || recording)) {
+  if (streaming || recording) {
+    if (isQuitting) return;
     event.preventDefault();
     isQuitting = true;
     Promise.all([
       streaming ? streamEngine.stop() : null,
       recording ? recorder.stop() : null,
     ]).finally(() => app.quit());
+    return;
+  }
+  // Mise à jour vérifiée en attente : on l'applique à la fermeture. Rien ne relance
+  // l'application — c'est la prochaine ouverture qui démarre la nouvelle version,
+  // ce qui évite d'attendre un redémarrage automatique qui peut ne pas venir.
+  if (updateService?.canInstallOnQuit?.()) {
+    quitUpdateStarted = true;
+    event.preventDefault();
+    updateService.installOnQuit()
+      .catch(() => false)
+      .finally(() => app.quit());
   }
 });
 

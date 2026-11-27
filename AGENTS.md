@@ -66,7 +66,8 @@ npm run desktop:win    # ffmpeg:fetch + build + electron-builder (ZIP portable)
 ## Mises à jour
 
 - `electron/update-service.cjs` : manifeste HTTPS, empreinte SHA-256, installation par script PowerShell qui attend la fermeture de l'application.
-- Automatique depuis la 0.5.6 : le téléchargement démarre dès qu'une version est annoncée, et l'installateur déjà vérifié s'applique au démarrage suivant (8 s après l'ouverture). `isBusy()` (direct ou enregistrement) bloque les deux.
+- Automatique : le téléchargement démarre dès qu'une version est annoncée, et l'installateur vérifié s'applique **à la fermeture** (`before-quit`), sans relance : la prochaine ouverture démarre la nouvelle version. `isBusy()` (direct ou enregistrement) bloque les deux.
+- L'installateur ne se relance lui-même qu'en mode silencieux sans `/CAMTON_QUIT`. Le bouton « Installer maintenant » utilise la relance ; la fermeture passe `/S /CAMTON_QUIT`.
 - Un échec d'installation est journalisé dans `%APPDATA%\Camton Live\updates\install-log.txt` et n'est jamais réessayé automatiquement : la bannière propose le clic.
 
 ## Signature Windows

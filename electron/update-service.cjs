@@ -29,7 +29,8 @@ const INSTALL_SCRIPT = `param(
   [Parameter(Mandatory=$true)][int]$AppPid,
   [Parameter(Mandatory=$true)][string]$Installer,
   [Parameter(Mandatory=$true)][string]$Log,
-  [Parameter(Mandatory=$true)][string]$AppExe
+  [Parameter(Mandatory=$true)][string]$AppExe,
+  [int]$Relaunch = 1
 )
 $ErrorActionPreference = 'Continue'
 function Write-Trace([string]$message) {
@@ -45,12 +46,18 @@ try {
 }
 Start-Sleep -Milliseconds 1500
 Write-Trace "Lancement de l'installateur en mode silencieux"
-$install = Start-Process -FilePath $Installer -ArgumentList '/S' -PassThru -Wait
+$arguments = '/S'
+if ($Relaunch -eq 0) { $arguments = '/S /CAMTON_QUIT' }
+$install = Start-Process -FilePath $Installer -ArgumentList $arguments -PassThru -Wait
 Write-Trace "Code de sortie de l'installateur : $($install.ExitCode)"
 if ($install.ExitCode -ne 0) {
   Write-Trace "Echec : l'installation n'a pas abouti. Ouvre $Installer a la main pour voir le message."
-  Start-Process -FilePath $AppExe -ErrorAction SilentlyContinue
+  if ($Relaunch -ne 0) { Start-Process -FilePath $AppExe -ErrorAction SilentlyContinue }
   exit 1
+}
+if ($Relaunch -eq 0) {
+  Write-Trace "Installation terminee sans relance"
+  exit 0
 }
 $relancee = $false
 for ($essai = 0; $essai -lt 20; $essai++) {
@@ -324,35 +331,61 @@ function createUpdateService({ app, emit, getIsStreaming, revealInFolder = () =>
     return downloadPromise;
   }
 
-  async function install() {
+  async function prepareInstaller() {
     if (process.platform !== 'win32' || !app.isPackaged) throw new Error('L’installation de mise à jour est disponible uniquement dans la version Windows installée.');
-    if (getIsStreaming()) throw new Error('Arrête le direct avant d’installer la mise à jour.');
     if (state.status !== 'downloaded' || !latestManifest) throw new Error('Télécharge d’abord la mise à jour.');
     const filePath = installerPath(latestManifest.version);
     if ((await hashFile(filePath)) !== latestManifest.sha256) {
       await fsp.rm(filePath, { force: true });
       latestManifest = null;
       setState('error', { errorMessage: 'Le fichier enregistré ne correspond plus à l’empreinte officielle. Relance le téléchargement.' });
-      return snapshot();
+      return null;
     }
     await fsp.mkdir(updatesFolder(), { recursive: true });
     const scriptPath = path.join(updatesFolder(), INSTALL_SCRIPT_NAME);
     await fsp.writeFile(scriptPath, `\ufeff${INSTALL_SCRIPT}`, 'utf8');
     await fsp.rm(installLogPath(), { force: true }).catch(() => {});
+    return { filePath, scriptPath };
+  }
+
+  function spawnInstaller({ filePath, scriptPath }, relaunch) {
     const args = [
       '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden',
       '-File', scriptPath, String(process.pid), filePath, installLogPath(), app.getPath('exe'),
+      relaunch ? '1' : '0',
     ];
     return new Promise((resolve, reject) => {
       const child = spawn('powershell.exe', args, { detached: true, stdio: 'ignore', windowsHide: true });
       child.once('error', (error) => reject(new Error(`Impossible de lancer l’installation : ${error.message}`)));
       child.once('spawn', () => {
         child.unref();
-        setState('installing', { progress: 100 });
-        setTimeout(() => app.quit(), 600);
-        resolve(snapshot());
+        resolve();
       });
     });
+  }
+
+  async function install() {
+    if (getIsStreaming()) throw new Error('Arrête le direct avant d’installer la mise à jour.');
+    const prepared = await prepareInstaller();
+    if (!prepared) return snapshot();
+    await spawnInstaller(prepared, true);
+    setState('installing', { progress: 100 });
+    setTimeout(() => app.quit(), 600);
+    return snapshot();
+  }
+
+  // Installation à la fermeture : rien ne relance l'application, la prochaine
+  // ouverture démarre directement la nouvelle version.
+  function canInstallOnQuit() {
+    return state.status === 'downloaded' && !state.lastInstallFailed && Boolean(latestManifest);
+  }
+
+  async function installOnQuit() {
+    if (!canInstallOnQuit() || getIsStreaming()) return false;
+    const prepared = await prepareInstaller().catch(() => null);
+    if (!prepared) return false;
+    await spawnInstaller(prepared, false).catch(() => {});
+    return true;
   }
 
   async function revealInstaller() {
@@ -363,7 +396,7 @@ function createUpdateService({ app, emit, getIsStreaming, revealInFolder = () =>
     return true;
   }
 
-  return Object.freeze({ check, download, install, revealInstaller, getState: snapshot });
+  return Object.freeze({ check, download, install, installOnQuit, canInstallOnQuit, revealInstaller, getState: snapshot });
 }
 
 module.exports = { UPDATE_MANIFEST_URL, UPDATE_MANIFEST_URLS, compareVersions, createUpdateService, parseManifest, parseVersion };

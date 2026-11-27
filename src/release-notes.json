@@ -1,8 +1,9 @@
 {
-  "version": "0.5.8",
+  "version": "0.5.9",
   "notes": [
-    "La table de mixage ne peut plus rester muette quand la carte son refuse le taux d’échantillonnage imposé : elle reprend les réglages par défaut au lieu d’échouer en silence.",
-    "Sous « Son de la source », une ligne dit ce que la capture contient vraiment : « Son système capté », « Capture sans son système », « piste coupée (M) » ou « volume à 0 % ».",
+    "La mise à jour s’installe quand tu fermes Camton Live : la prochaine ouverture démarre directement la nouvelle version. Plus besoin d’attendre un redémarrage automatique.",
+    "Le téléchargement se fait toujours tout seul en arrière-plan, et le bouton « Installer maintenant » reste là si tu veux appliquer tout de suite.",
+    "Rien ne s’installe pendant un direct ou un enregistrement : l’application termine la capture avant.",
     "Camton Live reste en bêta jusqu’à la version 1.0.0."
   ]
 }
