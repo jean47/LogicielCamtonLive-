@@ -44,6 +44,7 @@ contextBridge.exposeInMainWorld('lumaCastDesktop', Object.freeze({
   measureUpload: () => ipcRenderer.invoke('speed:measure'),
   saveBugReport: (input) => ipcRenderer.invoke('report:save', input),
   openBugIssue: (input) => ipcRenderer.invoke('report:open-issue', input),
+  checkInstallIntegrity: () => ipcRenderer.invoke('app:install-check'),
   getUpdateState: () => ipcRenderer.invoke('updates:get-state'),
   checkUpdates: () => ipcRenderer.invoke('updates:check'),
   downloadUpdate: () => ipcRenderer.invoke('updates:download'),

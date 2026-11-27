@@ -52,8 +52,12 @@ if ($install.ExitCode -ne 0) {
   Start-Process -FilePath $AppExe -ErrorAction SilentlyContinue
   exit 1
 }
-Start-Sleep -Milliseconds 1200
-if (-not (Get-Process -Name 'Camton Live' -ErrorAction SilentlyContinue)) {
+$relancee = $false
+for ($essai = 0; $essai -lt 20; $essai++) {
+  if (Get-Process -Name 'Camton Live' -ErrorAction SilentlyContinue) { $relancee = $true; break }
+  Start-Sleep -Milliseconds 500
+}
+if (-not $relancee) {
   Write-Trace "L'application ne s'est pas relancee seule : relance explicite"
   Start-Process -FilePath $AppExe -ErrorAction SilentlyContinue
 }

@@ -1634,6 +1634,10 @@ function init() {
   }) || null;
   desktop?.getUpdateState?.().then(renderUpdateNotice).catch(() => {});
   announceVersionChange();
+  desktop?.checkInstallIntegrity?.().then((report) => {
+    if (!report || report.consistent) return;
+    showToast(`Installation incomplète : ${report.installed} installé, ${report.running} lancé. Réinstalle Camton Live.`, 'warning');
+  }).catch(() => {});
   $('#appVersionPill')?.addEventListener('click', checkUpdatesManually);
 
   $('#updateAction').addEventListener('click', handleUpdateAction);

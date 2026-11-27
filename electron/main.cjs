@@ -9,6 +9,9 @@ const { createBugReporter } = require('./bug-report.cjs');
 const { measureUpload } = require('./speed-test.cjs');
 
 const APP_ID = 'fr.camtonlive.desktop';
+// Une mise à jour peut relancer l'application alors qu'une instance est déjà en
+// train de démarrer : deux instances écriraient dans le même stockage chiffré.
+const singleInstance = app.requestSingleInstanceLock();
 const isDevelopment = !app.isPackaged;
 let mainWindow;
 let isQuitting = false;
@@ -163,6 +166,22 @@ handleTrusted('report:open-issue', (_event, input) => bugReporter.openIssue({
   version: app.getVersion(),
   description: input?.description,
 }));
+// L'installateur écrit la version qu'il vient de copier. Si elle diffère de celle
+// qui tourne, la copie a été partielle : c'est le seul moyen de le voir depuis
+// l'application, et c'est ce qui produit des écrans à moitié dessinés.
+handleTrusted('app:install-check', () => {
+  const running = app.getVersion();
+  const marker = path.join(path.dirname(app.getPath('exe')), 'version-installee.txt');
+  let installed = null;
+  try {
+    installed = require('node:fs').readFileSync(marker, 'utf8').trim() || null;
+  } catch {
+    installed = null;
+  }
+  const consistent = !installed || installed === running;
+  if (!consistent) recordRendererIssue({ level: 'error', message: `installation partielle : ${installed} installé, ${running} lancé` });
+  return { running, installed, consistent };
+});
 handleTrusted('updates:get-state', () => updateService.getState());
 handleTrusted('updates:check', () => updateService.check());
 handleTrusted('updates:download', () => updateService.download());
@@ -173,6 +192,17 @@ handleTrusted('updates:reveal-installer', () => updateService.revealInstaller())
 // fermerait l'application au milieu d'une capture.
 function isBusy() {
   return Boolean(streamEngine?.isActive()) || Boolean(recorder?.isRecording());
+}
+
+if (!singleInstance) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  });
 }
 
 app.whenReady().then(() => {
