@@ -39,3 +39,27 @@ test('reject unsafe URLs, malformed checksums and invalid version metadata', () 
   assert.throws(() => parseManifest({ version: '0.4.2', sha256: 'not-a-hash' }), /invalide/);
   assert.throws(() => parseManifest({ version: 'latest' }), /version.*invalide/i);
 });
+
+test('refuse d’installer hors Windows ou sans fichier téléchargé', async () => {
+  const { createUpdateService } = require('./update-service.cjs');
+  const service = createUpdateService({
+    app: { getVersion: () => '0.5.0', isPackaged: true, getPath: (name) => (name === 'userData' ? require('node:os').tmpdir() : '/tmp') },
+    emit: () => {},
+    getIsStreaming: () => false,
+  });
+  if (process.platform !== 'win32') {
+    await assert.rejects(() => service.install(), /Windows/);
+  }
+  await assert.rejects(() => service.install(), /Télécharge d’abord|Windows/);
+});
+
+test('révéler le fichier de mise à jour exige une mise à jour en attente', async () => {
+  const { createUpdateService } = require('./update-service.cjs');
+  const service = createUpdateService({
+    app: { getVersion: () => '0.5.0', isPackaged: true, getPath: () => require('node:os').tmpdir() },
+    emit: () => {},
+    getIsStreaming: () => false,
+    revealInFolder: () => {},
+  });
+  await assert.rejects(() => service.revealInstaller(), /Aucune mise à jour/);
+});

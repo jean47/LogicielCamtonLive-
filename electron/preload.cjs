@@ -47,5 +47,6 @@ contextBridge.exposeInMainWorld('lumaCastDesktop', Object.freeze({
   getUpdateState: () => ipcRenderer.invoke('updates:get-state'),
   downloadUpdate: () => ipcRenderer.invoke('updates:download'),
   installUpdate: () => ipcRenderer.invoke('updates:install'),
+  revealUpdateFile: () => ipcRenderer.invoke('updates:reveal-installer'),
   onUpdateState,
 }));

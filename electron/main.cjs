@@ -144,6 +144,7 @@ handleTrusted('report:open-issue', (_event, input) => bugReporter.openIssue({
 handleTrusted('updates:get-state', () => updateService.getState());
 handleTrusted('updates:download', () => updateService.download());
 handleTrusted('updates:install', () => updateService.install());
+handleTrusted('updates:reveal-installer', () => updateService.revealInstaller());
 
 app.whenReady().then(() => {
   secretStore = createSecretStore({ app, safeStorage });
@@ -152,6 +153,7 @@ app.whenReady().then(() => {
     app,
     emit: emitUpdateState,
     getIsStreaming: () => streamEngine?.isActive() || false,
+    revealInFolder: (filePath) => shell.showItemInFolder(filePath),
   });
   recorder = createRecorder({ app, emit: emitRecordingState });
   bugReporter = createBugReporter({ app, openExternal: (url) => shell.openExternal(url) });

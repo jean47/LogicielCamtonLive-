@@ -59,9 +59,9 @@ VIAddVersionKey "Comments" "Installateur par utilisateur, sans droits administra
 ; Ferme l'application en cours : indispensable en mise à jour silencieuse,
 ; sinon Windows garde l'exécutable verrouillé et la copie échoue.
 !macro CloseRunningApp
-  nsExec::Exec 'taskkill /IM "${APP_EXE}" /F'
+  nsExec::Exec 'taskkill /IM "${APP_EXE}" /T /F'
   Pop $0
-  Sleep 800
+  Sleep 1500
 !macroend
 
 Section "Application" SecApp

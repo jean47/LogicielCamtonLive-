@@ -18,6 +18,49 @@ const MANIFEST_MAX_BYTES = 256 * 1024;
 const INSTALLER_MAX_BYTES = 1024 * 1024 * 1024;
 const REDIRECT_LIMIT = 4;
 const VERSION_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z.-]+))?$/;
+const INSTALL_SCRIPT_NAME = 'install-update.ps1';
+const INSTALL_LOG_NAME = 'install-log.txt';
+const INSTALL_LOG_TAIL = 1200;
+
+// L'application se ferme avant que l'installateur ne copie : sans cette attente,
+// Windows garde l'exécutable verrouillé et NSIS saute les fichiers en silence.
+// Le script journalise aussi le code de sortie, seule trace exploitable ensuite.
+const INSTALL_SCRIPT = `param(
+  [Parameter(Mandatory=$true)][int]$AppPid,
+  [Parameter(Mandatory=$true)][string]$Installer,
+  [Parameter(Mandatory=$true)][string]$Log,
+  [Parameter(Mandatory=$true)][string]$AppExe
+)
+$ErrorActionPreference = 'Continue'
+function Write-Trace([string]$message) {
+  Add-Content -LiteralPath $Log -Value ('{0:yyyy-MM-dd HH:mm:ss} {1}' -f (Get-Date), $message) -Encoding UTF8
+}
+Write-Trace "Mise a jour demandee : $Installer"
+try {
+  $process = Get-Process -Id $AppPid -ErrorAction Stop
+  Write-Trace "Attente de la fermeture de Camton Live (PID $AppPid)"
+  $process.WaitForExit(60000) | Out-Null
+} catch {
+  Write-Trace "Camton Live n'est plus en cours d'execution"
+}
+Start-Sleep -Milliseconds 1500
+Write-Trace "Lancement de l'installateur en mode silencieux"
+$install = Start-Process -FilePath $Installer -ArgumentList '/S' -PassThru -Wait
+Write-Trace "Code de sortie de l'installateur : $($install.ExitCode)"
+if ($install.ExitCode -ne 0) {
+  Write-Trace "Echec : l'installation n'a pas abouti. Ouvre $Installer a la main pour voir le message."
+  exit 1
+}
+$target = Join-Path $env:LOCALAPPDATA 'Programs/Camton Live/Camton Live.exe'
+if (-not (Test-Path -LiteralPath $target)) { $target = $AppExe }
+if (Test-Path -LiteralPath $target) {
+  Write-Trace "Relance de $target"
+  Start-Process -FilePath $target
+} else {
+  Write-Trace "Application introuvable apres installation : $target"
+  exit 1
+}
+`;
 
 function parseVersion(value) {
   if (typeof value !== 'string') return null;
@@ -156,7 +199,7 @@ async function hashFile(filePath) {
   return hash.digest('hex');
 }
 
-function createUpdateService({ app, emit, getIsStreaming, manifestUrl = UPDATE_MANIFEST_URL, manifestUrls = UPDATE_MANIFEST_URLS }) {
+function createUpdateService({ app, emit, getIsStreaming, revealInFolder = () => {}, manifestUrl = UPDATE_MANIFEST_URL, manifestUrls = UPDATE_MANIFEST_URLS }) {
   let state = { status: 'idle', currentVersion: app.getVersion(), latestVersion: null, releaseNotes: '', progress: 0 };
   let latestManifest = null;
   let checkPromise = null;
@@ -168,9 +211,28 @@ function createUpdateService({ app, emit, getIsStreaming, manifestUrl = UPDATE_M
     emit(snapshot());
     return snapshot();
   }
+  function updatesFolder() {
+    return path.join(app.getPath('userData'), 'updates');
+  }
   function installerPath(version) {
     const safeVersion = version.replace(/[^0-9A-Za-z.-]/g, '_');
-    return path.join(app.getPath('userData'), 'updates', `camton-live-setup-${safeVersion}.exe`);
+    return path.join(updatesFolder(), `camton-live-setup-${safeVersion}.exe`);
+  }
+  function installLogPath() {
+    return path.join(updatesFolder(), INSTALL_LOG_NAME);
+  }
+
+  async function readInstallLog() {
+    try {
+      const content = await fsp.readFile(installLogPath(), 'utf8');
+      return content.trim().slice(-INSTALL_LOG_TAIL) || null;
+    } catch {
+      return null;
+    }
+  }
+
+  function lastInstallFailed(log) {
+    return typeof log === 'string' && /(Echec|introuvable|Code de sortie de l'installateur : [1-9])/i.test(log);
   }
 
   async function check() {
@@ -186,9 +248,11 @@ function createUpdateService({ app, emit, getIsStreaming, manifestUrl = UPDATE_M
         }
         if (!manifest.downloadUrl || !manifest.sha256) throw new Error('La nouvelle version est annoncée sans lien ou empreinte de téléchargement.');
         const destination = installerPath(manifest.version);
+        const installLog = await readInstallLog();
+        const echec = lastInstallFailed(installLog);
         try {
           if ((await hashFile(destination)) === manifest.sha256) {
-            return setState('downloaded', { currentVersion, latestVersion: manifest.version, releaseNotes: manifest.releaseNotes, progress: 100 });
+            return setState('downloaded', { currentVersion, latestVersion: manifest.version, releaseNotes: manifest.releaseNotes, progress: 100, installLog, lastInstallFailed: echec });
           }
           await fsp.rm(destination, { force: true });
         } catch (error) {
@@ -269,19 +333,35 @@ function createUpdateService({ app, emit, getIsStreaming, manifestUrl = UPDATE_M
       setState('error', { errorMessage: 'Le fichier enregistré ne correspond plus à l’empreinte officielle. Relance le téléchargement.' });
       return snapshot();
     }
+    await fsp.mkdir(updatesFolder(), { recursive: true });
+    const scriptPath = path.join(updatesFolder(), INSTALL_SCRIPT_NAME);
+    await fsp.writeFile(scriptPath, `\ufeff${INSTALL_SCRIPT}`, 'utf8');
+    await fsp.rm(installLogPath(), { force: true }).catch(() => {});
+    const args = [
+      '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden',
+      '-File', scriptPath, String(process.pid), filePath, installLogPath(), app.getPath('exe'),
+    ];
     return new Promise((resolve, reject) => {
-      const child = spawn(filePath, ['/S'], { detached: true, stdio: 'ignore', windowsHide: true });
+      const child = spawn('powershell.exe', args, { detached: true, stdio: 'ignore', windowsHide: true });
       child.once('error', (error) => reject(new Error(`Impossible de lancer l’installation : ${error.message}`)));
       child.once('spawn', () => {
         child.unref();
         setState('installing', { progress: 100 });
-        setTimeout(() => app.quit(), 500);
+        setTimeout(() => app.quit(), 600);
         resolve(snapshot());
       });
     });
   }
 
-  return Object.freeze({ check, download, install, getState: snapshot });
+  async function revealInstaller() {
+    if (!latestManifest) throw new Error('Aucune mise à jour n’est en attente.');
+    const filePath = installerPath(latestManifest.version);
+    await fsp.access(filePath);
+    revealInFolder(filePath);
+    return true;
+  }
+
+  return Object.freeze({ check, download, install, revealInstaller, getState: snapshot });
 }
 
 module.exports = { UPDATE_MANIFEST_URL, UPDATE_MANIFEST_URLS, compareVersions, createUpdateService, parseManifest, parseVersion };

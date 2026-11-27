@@ -140,9 +140,12 @@ function renderUpdateNotice(update = state.updateStatus) {
     action.textContent = 'Téléchargement…';
     action.disabled = true;
   } else if (status === 'downloaded') {
+    const echec = state.updateStatus.lastInstallFailed;
     $('#updateMessage').textContent = state.isStreaming
       ? 'Le fichier est vérifié. Arrête ton direct pour pouvoir l’installer sans interruption.'
-      : 'Le fichier est vérifié. Installe maintenant et Camton Live redémarrera après la mise à jour.';
+      : echec
+        ? 'La dernière installation n’a pas abouti. Réessaie, ou ouvre le dossier et lance le fichier à la main.'
+        : 'Le fichier est vérifié. Installe maintenant et Camton Live redémarrera après la mise à jour.';
     action.textContent = state.isStreaming ? 'Arrête le direct pour installer' : 'Installer et redémarrer';
     action.disabled = state.isStreaming;
   } else if (status === 'installing') {
@@ -160,6 +163,7 @@ function renderUpdateNotice(update = state.updateStatus) {
     action.disabled = false;
   }
   $('#updateNotes').classList.toggle('hidden', !state.updateStatus.releaseNotes?.trim());
+  $('#updateReveal').classList.toggle('hidden', !(status === 'downloaded' || state.updateStatus.lastInstallFailed));
   $('#updateDismiss').classList.toggle('hidden', status === 'downloading' || status === 'installing');
   notice.classList.remove('hidden');
 }
@@ -1597,6 +1601,14 @@ function init() {
   desktop?.getUpdateState?.().then(renderUpdateNotice).catch(() => {});
 
   $('#updateAction').addEventListener('click', handleUpdateAction);
+  $('#updateReveal').addEventListener('click', async () => {
+    try {
+      await desktop?.revealUpdateFile?.();
+    } catch (error) {
+      state.updateStatus = { ...state.updateStatus, status: 'error', errorMessage: error?.message || 'Le fichier de mise à jour est introuvable. Retélécharge-le.' };
+      renderUpdateNotice();
+    }
+  });
   $('#updateDismiss').addEventListener('click', () => {
     state.updateDismissed = true;
     renderUpdateNotice();
