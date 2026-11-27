@@ -1,0 +1,28 @@
+name: Publier la release
+description: Crée le tag si besoin, puis la release GitHub avec les fichiers du dossier fourni.
+
+# Le job qui appelle cette action doit tourner dans un workflow direct : un workflow
+# réutilisable reçoit un jeton qui ne peut pas créer de tag (403 « Resource not
+# accessible by integration »), même avec `permissions: contents: write`.
+
+inputs:
+  tag:
+    description: Tag à publier (ex. v0.5.1)
+    required: true
+  target:
+    description: Commit à taguer si le tag n’existe pas encore
+    required: false
+    default: ''
+  dossier:
+    description: Dossier contenant les fichiers à joindre à la release
+    required: false
+    default: build
+
+runs:
+  using: composite
+  steps:
+    - name: Tag puis release
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: bash "${GITHUB_ACTION_PATH}/publier.sh" "${{ inputs.tag }}" "${{ inputs.target }}" "${{ inputs.dossier }}"

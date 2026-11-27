@@ -1,10 +1,14 @@
-name: Sonde (temporaire)
+name: Sonde publication (temporaire)
 on:
   workflow_dispatch:
 permissions:
   contents: write
 jobs:
-  appele:
-    permissions:
-      contents: write
-    uses: ./.github/workflows/sonde-appelee.yml
+  essai:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: mkdir -p build && echo essai > build/essai.txt
+      - uses: ./.github/actions/publier-release
+        with:
+          tag: v0.0.0-sonde
