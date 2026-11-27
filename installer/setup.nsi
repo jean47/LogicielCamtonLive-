@@ -68,6 +68,21 @@ Section "Application" SecApp
   SetShellVarContext current
   !insertmacro CloseRunningApp
 
+  ; Windows garde l'exécutable verrouillé quelques secondes après la fermeture de
+  ; l'application. En mode silencieux, NSIS saute alors les fichiers sans message :
+  ; l'utilisateur voit « installé » et garde l'ancienne version. On attend donc que
+  ; le fichier soit réellement supprimable, jusqu'à 30 secondes.
+  StrCpy $1 0
+  camton_attente:
+    Delete "$INSTDIR\${APP_EXE}"
+    IfFileExists "$INSTDIR\${APP_EXE}" 0 camton_copie
+    IntOp $1 $1 + 1
+    IntCmp $1 30 camton_copie camton_pause camton_copie
+  camton_pause:
+    Sleep 1000
+    Goto camton_attente
+  camton_copie:
+
   SetOutPath "$INSTDIR"
   File /r "..\release\win-unpacked\*.*"
 
@@ -90,6 +105,15 @@ Section "Application" SecApp
   ${GetSize} "$INSTDIR" "/S=0K" $0 $1 $2
   IntFmt $0 "0x%08X" $0
   WriteRegDWORD HKCU "${UNINST_KEY}" "EstimatedSize" "$0"
+
+  ; En mise à jour silencieuse, personne ne relance l'application : sans cela
+  ; l'utilisateur reste devant une fenêtre fermée et croit que rien ne s'est passé.
+  IfSilent 0 camton_fin
+  FileOpen $2 "$INSTDIR\version-installee.txt" w
+  FileWrite $2 "${VERSION}$\r$\n"
+  FileClose $2
+  Exec '"$INSTDIR\${APP_EXE}"'
+  camton_fin:
 SectionEnd
 
 Section "Uninstall"

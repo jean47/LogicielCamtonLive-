@@ -35,7 +35,7 @@ $ErrorActionPreference = 'Continue'
 function Write-Trace([string]$message) {
   Add-Content -LiteralPath $Log -Value ('{0:yyyy-MM-dd HH:mm:ss} {1}' -f (Get-Date), $message) -Encoding UTF8
 }
-Write-Trace "Mise a jour demandee : $Installer"
+Write-Trace "Mise a jour demandee : $Installer (application $AppExe)"
 try {
   $process = Get-Process -Id $AppPid -ErrorAction Stop
   Write-Trace "Attente de la fermeture de Camton Live (PID $AppPid)"
@@ -51,15 +51,7 @@ if ($install.ExitCode -ne 0) {
   Write-Trace "Echec : l'installation n'a pas abouti. Ouvre $Installer a la main pour voir le message."
   exit 1
 }
-$target = Join-Path $env:LOCALAPPDATA 'Programs/Camton Live/Camton Live.exe'
-if (-not (Test-Path -LiteralPath $target)) { $target = $AppExe }
-if (Test-Path -LiteralPath $target) {
-  Write-Trace "Relance de $target"
-  Start-Process -FilePath $target
-} else {
-  Write-Trace "Application introuvable apres installation : $target"
-  exit 1
-}
+Write-Trace "Fin de la mise a jour"
 `;
 
 function parseVersion(value) {
