@@ -15,7 +15,10 @@
     "ffmpeg:fetch": "node scripts/fetch-ffmpeg.mjs",
     "desktop:win": "npm run ffmpeg:fetch && npm run build && electron-builder --win zip --x64 && npm run installer:win && npm run publish:update",
     "installer:win": "node scripts/build-installer.mjs",
-    "publish:update": "node scripts/publish-update.mjs"
+    "publish:update": "node scripts/publish-update.mjs",
+    "sign:local": "node scripts/sign-local.mjs",
+    "sign:verify": "node scripts/sign-local.mjs --verify",
+    "release:win": "npm run desktop:win && npm run sign:verify && node scripts/publish-release.mjs"
   },
   "build": {
     "appId": "fr.camtonlive.desktop",

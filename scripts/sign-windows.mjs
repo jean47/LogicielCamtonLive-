@@ -8,10 +8,25 @@ import { fileURLToPath } from 'node:url';
 const TIMESTAMP_URL = 'http://timestamp.digicert.com';
 const DESCRIPTION = 'Camton Live';
 
-// Le certificat vit hors du dépôt. Deux formes acceptées : un chemin vers un .pfx
-// (CI, fichier préparé en amont) ou le .pfx encodé en base64 (secret unique).
+// Deux façons de désigner le certificat, jamais dans le dépôt :
+//  - un fichier .pfx (chemin, ou base64 dans un secret) ;
+//  - l'empreinte d'un certificat installé, ce qui est le seul moyen avec un token
+//    matériel, obligatoire depuis juin 2023 pour les certificats récents.
 export function signingConfigured() {
-  return Boolean(process.env.WINDOWS_CERT_PFX_PATH || process.env.WINDOWS_CERT_PFX_BASE64);
+  return Boolean(certificateArgs());
+}
+
+export function certificateArgs() {
+  const pfx = resolvePfx();
+  if (pfx) {
+    const password = process.env.WINDOWS_CERT_PASSWORD || '';
+    return password ? ['/f', pfx, '/p', password] : ['/f', pfx];
+  }
+  const thumbprint = String(process.env.WINDOWS_CERT_SHA1 || '').replace(/[^0-9a-fA-F]/g, '');
+  if (!thumbprint) return null;
+  const args = ['/sha1', thumbprint];
+  if (String(process.env.WINDOWS_CERT_STORE || '').toLowerCase() === 'machine') args.push('/sm');
+  return args;
 }
 
 function resolvePfx() {
@@ -58,13 +73,10 @@ export function signFiles(files) {
   if (!signtool) {
     throw new Error('signtool.exe introuvable : installe le SDK Windows ou définis SIGNTOOL.');
   }
-  const certificate = resolvePfx();
-  const password = process.env.WINDOWS_CERT_PASSWORD || '';
+  const certificate = certificateArgs();
 
   for (const file of targets) {
-    const args = ['sign', '/fd', 'sha256', '/f', certificate, '/tr', TIMESTAMP_URL, '/td', 'sha256', '/d', DESCRIPTION];
-    if (password) args.push('/p', password);
-    args.push(file);
+    const args = ['sign', '/fd', 'sha256', ...certificate, '/tr', TIMESTAMP_URL, '/td', 'sha256', '/d', DESCRIPTION, file];
     execFileSync(signtool, args, { stdio: 'inherit' });
     console.log(`Signé : ${path.relative(process.cwd(), file) || file}`);
   }
