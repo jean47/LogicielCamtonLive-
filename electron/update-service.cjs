@@ -49,7 +49,13 @@ $install = Start-Process -FilePath $Installer -ArgumentList '/S' -PassThru -Wait
 Write-Trace "Code de sortie de l'installateur : $($install.ExitCode)"
 if ($install.ExitCode -ne 0) {
   Write-Trace "Echec : l'installation n'a pas abouti. Ouvre $Installer a la main pour voir le message."
+  Start-Process -FilePath $AppExe -ErrorAction SilentlyContinue
   exit 1
+}
+Start-Sleep -Milliseconds 1200
+if (-not (Get-Process -Name 'Camton Live' -ErrorAction SilentlyContinue)) {
+  Write-Trace "L'application ne s'est pas relancee seule : relance explicite"
+  Start-Process -FilePath $AppExe -ErrorAction SilentlyContinue
 }
 Write-Trace "Fin de la mise a jour"
 `;

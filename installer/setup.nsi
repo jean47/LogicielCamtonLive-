@@ -75,13 +75,25 @@ Section "Application" SecApp
   StrCpy $1 0
   camton_attente:
     Delete "$INSTDIR\${APP_EXE}"
-    IfFileExists "$INSTDIR\${APP_EXE}" 0 camton_copie
+    IfFileExists "$INSTDIR\${APP_EXE}" 0 camton_verifie
     IntOp $1 $1 + 1
-    IntCmp $1 30 camton_copie camton_pause camton_copie
+    IntCmp $1 30 camton_verifie camton_pause camton_verifie
   camton_pause:
     Sleep 1000
     Goto camton_attente
+  camton_verifie:
+  ; Si l'exécutable résiste encore, la copie serait partielle et silencieuse :
+  ; mieux vaut échouer, l'application signalera l'échec au redémarrage.
+  IfFileExists "$INSTDIR\${APP_EXE}" camton_verrouille camton_copie
+  camton_verrouille:
+    SetErrorLevel 1
+    IfSilent camton_abandon 0
+    MessageBox MB_ICONSTOP "Camton Live est encore ouvert. Ferme-le, puis relance l'installation."
+  camton_abandon:
+    Quit
+
   camton_copie:
+  Delete "$INSTDIR\resources\app.asar"
 
   SetOutPath "$INSTDIR"
   File /r "..\release\win-unpacked\*.*"
@@ -108,10 +120,10 @@ Section "Application" SecApp
 
   ; En mise à jour silencieuse, personne ne relance l'application : sans cela
   ; l'utilisateur reste devant une fenêtre fermée et croit que rien ne s'est passé.
-  IfSilent 0 camton_fin
   FileOpen $2 "$INSTDIR\version-installee.txt" w
   FileWrite $2 "${VERSION}$\r$\n"
   FileClose $2
+  IfSilent 0 camton_fin
   Exec '"$INSTDIR\${APP_EXE}"'
   camton_fin:
 SectionEnd

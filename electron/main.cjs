@@ -164,6 +164,7 @@ handleTrusted('report:open-issue', (_event, input) => bugReporter.openIssue({
   description: input?.description,
 }));
 handleTrusted('updates:get-state', () => updateService.getState());
+handleTrusted('updates:check', () => updateService.check());
 handleTrusted('updates:download', () => updateService.download());
 handleTrusted('updates:install', () => updateService.install());
 handleTrusted('updates:reveal-installer', () => updateService.revealInstaller());
@@ -193,6 +194,13 @@ app.whenReady().then(() => {
 
   createMainWindow();
   const updateCheckTimer = setTimeout(() => updateService.check(), 5000);
+  // Une vérification ratée au démarrage ne doit pas condamner la session entière :
+  // on repasse toutes les six heures, sans toucher à un téléchargement en cours.
+  const updatePollTimer = setInterval(() => {
+    const { status } = updateService.getState();
+    if (['idle', 'up-to-date', 'unavailable', 'available'].includes(status)) updateService.check();
+  }, 6 * 60 * 60 * 1000);
+  updatePollTimer.unref?.();
   updateCheckTimer.unref();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();

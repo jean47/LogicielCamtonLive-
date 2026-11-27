@@ -145,6 +145,14 @@ button, select, input { font: inherit; color: inherit; }
   text-transform: uppercase;
 }
 
+.pill-button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.pill-button:hover { background: rgba(251, 196, 94, .16); }
+.pill-button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
 .pill-dot {
   width: 6px;
   height: 6px;

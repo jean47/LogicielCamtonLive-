@@ -3,6 +3,7 @@ import { createCompositor } from './compositor.js';
 import { createAudioDesk } from './audio-desk.js';
 import releaseNotes from './release-notes.json';
 import { parseNotes, shouldAnnounce } from './whats-new.js';
+import { isNewerVersion } from './version.js';
 import { describeMeasurement } from './speed-verdict.js';
 import './styles/index.css';
 
@@ -168,6 +169,39 @@ function renderUpdateNotice(update = state.updateStatus) {
   $('#updateReveal').classList.toggle('hidden', !(status === 'downloaded' || state.updateStatus.lastInstallFailed));
   $('#updateDismiss').classList.toggle('hidden', status === 'downloading' || status === 'installing');
   notice.classList.remove('hidden');
+}
+
+const RUNNING_VERSION_KEY = 'camton-running-version';
+
+// Une mise à jour silencieuse ferme l'application : sans ce mot au redémarrage,
+// rien ne dit si elle a été appliquée.
+function announceVersionChange() {
+  const previous = localStorage.getItem(RUNNING_VERSION_KEY);
+  localStorage.setItem(RUNNING_VERSION_KEY, APP_VERSION);
+  if (!previous || !isNewerVersion(APP_VERSION, previous)) return;
+  showToast(`Mise à jour appliquée : ${versionLabel()}`, 'success');
+}
+
+async function checkUpdatesManually() {
+  if (!desktop?.isDesktopApp) {
+    showToast('Les mises à jour concernent l’application de bureau.', 'info');
+    return;
+  }
+  try {
+    const next = await desktop.checkUpdates?.();
+    if (next?.status === 'up-to-date') {
+      showToast(`Tu es à jour : ${versionLabel()}`, 'success');
+      return;
+    }
+    if (next?.status === 'available' || next?.status === 'downloaded') {
+      state.updateDismissed = false;
+      renderUpdateNotice(next);
+      return;
+    }
+    showToast('Vérification impossible pour le moment. Réessaie dans un instant.', 'warning');
+  } catch {
+    showToast('Vérification impossible pour le moment. Réessaie dans un instant.', 'warning');
+  }
 }
 
 async function handleUpdateAction() {
@@ -1599,6 +1633,8 @@ function init() {
     }
   }) || null;
   desktop?.getUpdateState?.().then(renderUpdateNotice).catch(() => {});
+  announceVersionChange();
+  $('#appVersionPill')?.addEventListener('click', checkUpdatesManually);
 
   $('#updateAction').addEventListener('click', handleUpdateAction);
   $('#updateReveal').addEventListener('click', async () => {

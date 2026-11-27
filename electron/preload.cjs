@@ -45,6 +45,7 @@ contextBridge.exposeInMainWorld('lumaCastDesktop', Object.freeze({
   saveBugReport: (input) => ipcRenderer.invoke('report:save', input),
   openBugIssue: (input) => ipcRenderer.invoke('report:open-issue', input),
   getUpdateState: () => ipcRenderer.invoke('updates:get-state'),
+  checkUpdates: () => ipcRenderer.invoke('updates:check'),
   downloadUpdate: () => ipcRenderer.invoke('updates:download'),
   installUpdate: () => ipcRenderer.invoke('updates:install'),
   revealUpdateFile: () => ipcRenderer.invoke('updates:reveal-installer'),

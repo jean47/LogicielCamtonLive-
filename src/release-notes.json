@@ -1,8 +1,10 @@
 {
-  "version": "0.5.4",
+  "version": "0.5.5",
   "notes": [
-    "Le bouton marche/arrêt de la piste « Son de la source » rouvre directement le choix d’écran ou de fenêtre. Le son système se prend avec la capture, pas séparément.",
-    "Le rapport de problème joint désormais les erreurs de l’interface. Quand un écran s’affiche à moitié, le message exact accompagne le rapport.",
+    "La mise à jour ne peut plus s’installer à moitié : si l’ancienne version résiste encore, l’installateur échoue franchement au lieu de copier une partie des fichiers.",
+    "Camton Live se relance tout seul après la mise à jour, et aussi quand elle échoue, pour en afficher la raison.",
+    "La pastille de version, en haut à droite, vérifie les mises à jour d’un clic. Après une mise à jour, un message confirme la version installée.",
+    "La vérification repasse toutes les six heures, au lieu d’une seule fois au démarrage.",
     "Camton Live reste en bêta jusqu’à la version 1.0.0."
   ]
 }
