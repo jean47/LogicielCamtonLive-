@@ -29,7 +29,7 @@ jobs:
         run: |
           mapfile -t fichiers < <(find release-files -type f | sort)
           ls -lh "${fichiers[@]}"
-          gh release create v0.5.2-rc.2 "${fichiers[@]}" -R "$GITHUB_REPOSITORY" \
-            --title "Camton Live 0.5.2 — build de test 2" \
+          gh release create v0.5.2-rc.3 "${fichiers[@]}" -R "$GITHUB_REPOSITORY" \
+            --title "Camton Live 0.5.2 — build de test 3" \
             --prerelease \
-            --notes "Build de test avec le correctif audio (réactivation des pistes)."
+            --notes "Build de test avec le limiteur audio et sondage des encodeurs à la résolution réelle."
