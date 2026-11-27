@@ -1,9 +1,9 @@
 {
-  "version": "0.5.10",
+  "version": "0.5.11",
   "notes": [
-    "Nouvelle piste « Sortie du PC » : elle prend la sortie audio par défaut de Windows, comme la « Desktop Audio » d’OBS. Un clic pour l’allumer, un clic pour la couper.",
-    "Elle est indépendante de la source vidéo et du direct : plus besoin de recapturer l’écran pour avoir le son du PC, et elle reste allumée après un direct.",
-    "Chaque piste garde son volume, son muet et son solo ; la table mélange le tout pour le direct comme pour l’enregistrement.",
+    "La piste « Sortie du PC » accepte maintenant n’importe quelle entrée audio : dans sa liste, garde « Sortie du PC (sortie par défaut) », ou choisis une entrée du PC — Mixage stéréo, entrée ligne, carte de capture.",
+    "Le choix est mémorisé et la piste se rallume avec le même appareil au démarrage suivant.",
+    "Si la sortie par défaut reste muette : Paramètres Windows → Son → Enregistrement → clic droit → « Afficher les appareils désactivés » → activer « Mixage stéréo », puis le choisir dans Camton Live.",
     "Camton Live reste en bêta jusqu’à la version 1.0.0."
   ]
 }

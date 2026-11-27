@@ -33,12 +33,20 @@ export function describeSourceCapture(stream, track = null) {
 
 function trackMarkup(track, config, devices, removable, anySolo, hint) {
   const device = devices.find((item) => item.deviceId === track.deviceId);
+  const deviceOptions = devices
+    .map((item, index) => `<option value="${item.deviceId}"${item.deviceId === track.deviceId ? ' selected' : ''}>${item.label || `Entrée ${index + 1}`}</option>`)
+    .join('');
   const subtitle = MIC_KINDS.has(track.kind)
     ? `<select class="track-device" data-role="device" aria-label="Microphone de ${config.label}">
          <option value="">Micro par défaut</option>
-         ${devices.map((item, index) => `<option value="${item.deviceId}"${item.deviceId === track.deviceId ? ' selected' : ''}>${item.label || `Microphone ${index + 1}`}</option>`).join('')}
+         ${deviceOptions}
        </select>`
-    : `<small${hint?.warning ? ' class="track-hint track-hint--warning"' : ' class="track-hint"'}>${hint?.label || track.file?.name || config.hint}</small>`;
+    : track.kind === 'desktop'
+      ? `<select class="track-device" data-role="device" aria-label="Entrée audio de ${config.label}">
+           <option value="">Sortie du PC (sortie par défaut)</option>
+           ${deviceOptions}
+         </select>`
+      : `<small${hint?.warning ? ' class="track-hint track-hint--warning"' : ' class="track-hint"'}>${hint?.label || track.file?.name || config.hint}</small>`;
   const deviceLabel = device?.label || '';
   return `
     <li class="track${track.active ? '' : ' inactive'}${track.muted ? ' muted' : ''}${track.solo ? ' solo' : ''}${anySolo && !track.solo ? ' dimmed' : ''}" data-track-id="${track.id}" data-kind="${track.kind}">
@@ -78,14 +86,15 @@ export function createAudioDesk({ listElement, master, onStatus, onError, onToas
     onStatus?.({ active: active.length, micReady, count: tracks.size });
   }
 
-  function createTrack(kind, { id = kind, deviceId = '', file = null } = {}) {
+  function createTrack(kind, { id = kind, deviceId, file = null } = {}) {
     if (tracks.has(id)) return tracks.get(id);
     const config = TRACK_KINDS[kind];
     const saved = settings[kind] || {};
+    const entry = deviceId ?? saved.deviceId ?? '';
     const track = {
       id,
       kind,
-      deviceId,
+      deviceId: entry,
       file,
       stream: null,
       element: null,
@@ -101,7 +110,7 @@ export function createAudioDesk({ listElement, master, onStatus, onError, onToas
   }
 
   function persist(track) {
-    settings[track.kind] = { volume: track.volume, muted: track.muted, solo: track.solo };
+    settings[track.kind] = { volume: track.volume, muted: track.muted, solo: track.solo, deviceId: track.deviceId };
     writeSettings(settings);
   }
 
@@ -180,15 +189,29 @@ export function createAudioDesk({ listElement, master, onStatus, onError, onToas
   // main. Elle prend la sortie audio par défaut de Windows, comme la « Desktop
   // Audio » d'OBS, sans dépendre de ce que l'aperçu montre.
   async function startDesktopAudio(track) {
+    if (track.deviceId) {
+      const stream = await navigator.mediaDevices
+        .getUserMedia({ audio: { deviceId: { exact: track.deviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false } })
+        .catch(() => null);
+      if (!stream) {
+        onToast?.('Cette entrée audio n’a pas pu être ouverte. Choisis-en une autre.', 'warning');
+        return false;
+      }
+      return attachDesktopStream(track, stream);
+    }
     if (!onCaptureDesktopAudio) {
       onToast?.('La capture de la sortie du PC est disponible dans l’application de bureau.', 'warning');
       return false;
     }
     const stream = await onCaptureDesktopAudio().catch(() => null);
     if (!stream || !stream.getAudioTracks().length) {
-      onToast?.('Aucune sortie audio du PC n’a pu être captée. Vérifie la sortie par défaut de Windows.', 'warning');
+      onToast?.('Aucune sortie audio du PC n’a pu être captée. Choisis une entrée dans la liste, ou active « Mixage stéréo » dans Windows.', 'warning');
       return false;
     }
+    return attachDesktopStream(track, stream);
+  }
+
+  async function attachDesktopStream(track, stream) {
     track.stream = stream;
     track.active = await mixer.attachStream(track.id, stream).catch(() => false);
     if (!track.active) {
@@ -303,10 +326,12 @@ export function createAudioDesk({ listElement, master, onStatus, onError, onToas
       const track = tracks.get(event.target.closest('[data-track-id]').dataset.trackId);
       if (!track) return;
       track.deviceId = event.target.value;
+      if (track.kind === 'desktop') persist(track);
       if (track.active) {
         stopCapture(track);
-        startMic(track)
-          .catch((error) => onError?.(error, 'ton micro'))
+        const restart = track.kind === 'desktop' ? startDesktopAudio(track) : startMic(track);
+        restart
+          .catch((error) => onError?.(error, track.kind === 'desktop' ? 'la sortie du PC' : 'ton micro'))
           .finally(render);
       }
     });
