@@ -1,9 +1,9 @@
 {
-  "version": "0.5.9",
+  "version": "0.5.10",
   "notes": [
-    "La mise à jour s’installe quand tu fermes Camton Live : la prochaine ouverture démarre directement la nouvelle version. Plus besoin d’attendre un redémarrage automatique.",
-    "Le téléchargement se fait toujours tout seul en arrière-plan, et le bouton « Installer maintenant » reste là si tu veux appliquer tout de suite.",
-    "Rien ne s’installe pendant un direct ou un enregistrement : l’application termine la capture avant.",
+    "Nouvelle piste « Sortie du PC » : elle prend la sortie audio par défaut de Windows, comme la « Desktop Audio » d’OBS. Un clic pour l’allumer, un clic pour la couper.",
+    "Elle est indépendante de la source vidéo et du direct : plus besoin de recapturer l’écran pour avoir le son du PC, et elle reste allumée après un direct.",
+    "Chaque piste garde son volume, son muet et son solo ; la table mélange le tout pour le direct comme pour l’enregistrement.",
     "Camton Live reste en bêta jusqu’à la version 1.0.0."
   ]
 }

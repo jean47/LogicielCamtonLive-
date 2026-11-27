@@ -2,6 +2,7 @@ export const TRACK_KINDS = {
   mic: { label: 'Micro principal', hint: 'Ta voix, toujours présente dans le direct', volume: 1, icon: '♩', removable: false },
   mic2: { label: 'Second micro', hint: 'Invité, casque ou micro d’appoint', volume: 1, icon: '♫', removable: true },
   source: { label: 'Son de la source', hint: 'Jeu, écran ou carte de capture', volume: 0.7, icon: '▣', removable: false },
+  desktop: { label: 'Sortie du PC', hint: 'Tout ce que le PC joue, sortie par défaut', volume: 0.8, icon: '◍', removable: false },
   music: { label: 'Musique', hint: 'Fichier audio local', volume: 0.6, icon: '♪', removable: true },
 };
 

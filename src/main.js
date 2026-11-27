@@ -73,7 +73,16 @@ const audioDesk = createAudioDesk({
   onToast: (message, type) => showToast(message, type),
   // Le son de la source ne se rétablit pas sans une capture : on rouvre le sélecteur.
   onRequestSource: () => $('#capturePcBtn')?.click(),
+  onCaptureDesktopAudio: captureDesktopAudio,
 });
+
+// Sortie par défaut du PC, capturée pour elle-même. La capture porte aussi une
+// vidéo à 5 images/s : on la garde vivante, la couper interrompt le son système
+// sur certaines configurations Windows. Seul l'audio entre dans la table.
+async function captureDesktopAudio() {
+  if (!desktop?.isDesktopApp) return null;
+  return captureLoopbackAudio();
+}
 
 const SEEN_VERSION_KEY = 'camton-seen-version';
 

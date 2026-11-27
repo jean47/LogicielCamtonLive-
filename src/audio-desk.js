@@ -60,7 +60,7 @@ function trackMarkup(track, config, devices, removable, anySolo, hint) {
     </li>`;
 }
 
-export function createAudioDesk({ listElement, master, onStatus, onError, onToast, onRequestSource } = {}) {
+export function createAudioDesk({ listElement, master, onStatus, onError, onToast, onRequestSource, onCaptureDesktopAudio } = {}) {
   const mixer = new AudioMixer();
   const settings = readSettings();
   const tracks = new Map();
@@ -176,6 +176,35 @@ export function createAudioDesk({ listElement, master, onStatus, onError, onToas
     return true;
   }
 
+  // Sortie du PC : capture indépendante de la source vidéo, allumée et coupée à la
+  // main. Elle prend la sortie audio par défaut de Windows, comme la « Desktop
+  // Audio » d'OBS, sans dépendre de ce que l'aperçu montre.
+  async function startDesktopAudio(track) {
+    if (!onCaptureDesktopAudio) {
+      onToast?.('La capture de la sortie du PC est disponible dans l’application de bureau.', 'warning');
+      return false;
+    }
+    const stream = await onCaptureDesktopAudio().catch(() => null);
+    if (!stream || !stream.getAudioTracks().length) {
+      onToast?.('Aucune sortie audio du PC n’a pu être captée. Vérifie la sortie par défaut de Windows.', 'warning');
+      return false;
+    }
+    track.stream = stream;
+    track.active = await mixer.attachStream(track.id, stream).catch(() => false);
+    if (!track.active) {
+      stopCapture(track);
+      return false;
+    }
+    const [audio] = stream.getAudioTracks();
+    audio?.addEventListener('ended', () => {
+      if (track.stream !== stream) return;
+      stopCapture(track);
+      onToast?.('La sortie du PC s’est interrompue.', 'warning');
+      render();
+    }, { once: true });
+    return true;
+  }
+
   function stopCapture(track) {
     if (track.element) {
       track.element.pause();
@@ -220,7 +249,8 @@ export function createAudioDesk({ listElement, master, onStatus, onError, onToas
         render();
         return;
       }
-      if (track.kind === 'music') await startMusic(track);
+      if (track.kind === 'desktop') await startDesktopAudio(track);
+      else if (track.kind === 'music') await startMusic(track);
       else await startMic(track);
       render();
     } catch (error) {
@@ -310,6 +340,7 @@ export function createAudioDesk({ listElement, master, onStatus, onError, onToas
   }
 
   createTrack('source');
+  createTrack('desktop');
   createTrack('mic');
   render();
   refreshDevices();
@@ -383,12 +414,18 @@ export function createAudioDesk({ listElement, master, onStatus, onError, onToas
       return mixer.getOutputStream();
     },
     releaseCaptures() {
-      for (const track of tracks.values()) stopCapture(track);
+      for (const track of tracks.values()) {
+        // La sortie du PC ne dépend pas du direct : elle reste allumée tant que
+        // l'utilisateur ne la coupe pas lui-même.
+        if (track.kind === 'desktop') continue;
+        stopCapture(track);
+      }
       render();
     },
     destroy() {
       cancelAnimationFrame(animationFrame);
-      this.releaseCaptures();
+      for (const track of tracks.values()) stopCapture(track);
+      render();
       mixer.dispose();
     },
   };
