@@ -1,0 +1,39 @@
+name: Publication différée — 0.5.2 (supervision, débit, rapport)
+
+# Publie la 0.5.2 le 3 décembre 2026 à 11:00 à Paris (10:00 UTC, heure d'hiver).
+# C'est la version qui affiche le débit réel par destination, mesure le débit montant,
+# accepte quatre destinations et prépare un rapport de problème.
+#
+# La cible est le commit qui porte ces quatre chantiers. Si du code livrable apparaît
+# sur la branche sans changement de version d'ici là, le garde-fou échoue au lieu de
+# publier une version amputée du correctif.
+on:
+  schedule:
+    - cron: '0 10 3 12 *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  garde:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: La cible couvre-t-elle le code publié ?
+        shell: bash
+        run: bash .github/scripts/guard-release.sh .github/workflows/publish-0-5-2.yml
+
+  publish:
+    needs: garde
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: v0.5.2
+      target: da6c566cd7337853a47baf19df315d5b85bbe150
