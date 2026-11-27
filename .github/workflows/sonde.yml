@@ -1,0 +1,10 @@
+name: Sonde (temporaire)
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  appele:
+    permissions:
+      contents: write
+    uses: ./.github/workflows/sonde-appelee.yml
