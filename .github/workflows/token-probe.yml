@@ -6,21 +6,7 @@ permissions:
   contents: write
 
 jobs:
-  windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: gh release create, avec et sans cible
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh --version | head -1
-          echo test > asset.txt
-          echo "--- avec --target ---"
-          gh release create v0.0.0-probeA asset.txt --title probeA --target "${{ github.sha }}" --generate-notes; echo "code=$?"
-          echo "--- sans --target ---"
-          gh release create v0.0.0-probeB asset.txt --title probeB --generate-notes; echo "code=$?"
+  appele:
+    permissions:
+      contents: write
+    uses: ./.github/workflows/token-probe-called.yml

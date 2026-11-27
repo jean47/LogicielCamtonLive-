@@ -1,0 +1,28 @@
+name: Sonde appelée (temporaire)
+on:
+  workflow_call:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: gh release create depuis un job appelé Windows
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo test > asset.txt
+          echo "--- gh avec --target ---"
+          gh release create v0.0.0-probeC asset.txt --title probeC --target e835f4b03855c961415914d1e447d9dc9cccd184 --generate-notes; echo "gh code=$?"
+          echo "--- curl POST /releases ---"
+          code=$(curl -s -o /tmp/o.json -w '%{http_code}' -X POST -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases" -d '{"tag_name":"v0.0.0-probeD","name":"probeD","draft":true,"prerelease":true}')
+          echo "curl code=$code"; head -c 200 /tmp/o.json; echo
