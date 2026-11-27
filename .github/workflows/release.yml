@@ -39,6 +39,8 @@ jobs:
 
   windows:
     needs: test
+    permissions:
+      contents: write
     runs-on: windows-latest
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
