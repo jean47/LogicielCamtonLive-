@@ -1,10 +1,8 @@
 {
-  "version": "0.5.3",
+  "version": "0.5.4",
   "notes": [
-    "Le son de la source ne grésille plus : l’aperçu est capturé au plus en 1080p, et le rendu vidéo ne prend plus les ressources dont l’audio a besoin.",
-    "Le profil « Très net » demande vraiment 60 images par seconde à la capture. Il en demandait 30, la cadence était ensuite doublée à l’encodage.",
-    "Mixage en 48 kHz avec un tampon large et limiteur en sortie : plus de rééchantillonnage, plus d’écrêtage quand plusieurs pistes parlent ensemble.",
-    "L’encodeur vidéo est testé à la résolution du profil choisi, pas en 360p : un encodeur qui ne tient pas le 1080p60 n’est plus retenu.",
+    "Le bouton marche/arrêt de la piste « Son de la source » rouvre directement le choix d’écran ou de fenêtre. Le son système se prend avec la capture, pas séparément.",
+    "Le rapport de problème joint désormais les erreurs de l’interface. Quand un écran s’affiche à moitié, le message exact accompagne le rapport.",
     "Camton Live reste en bêta jusqu’à la version 1.0.0."
   ]
 }
