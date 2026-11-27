@@ -20,14 +20,25 @@ function writeSettings(settings) {
   }
 }
 
-function trackMarkup(track, config, devices, removable, anySolo) {
+// Ce que la capture contient vraiment : sans cette information, une piste muette
+// ressemble à un réglage oublié alors que le flux n'a tout simplement pas de son.
+export function describeSourceCapture(stream, track = null) {
+  if (!stream) return null;
+  const audio = stream.getAudioTracks?.() || [];
+  if (!audio.some((item) => item.readyState === 'live')) return { label: 'Capture sans son système', warning: true };
+  if (track?.muted) return { label: 'Son système capté, piste coupée (M)', warning: true };
+  if (track && track.volume <= 0) return { label: 'Son système capté, volume à 0 %', warning: true };
+  return { label: 'Son système capté', warning: false };
+}
+
+function trackMarkup(track, config, devices, removable, anySolo, hint) {
   const device = devices.find((item) => item.deviceId === track.deviceId);
   const subtitle = MIC_KINDS.has(track.kind)
     ? `<select class="track-device" data-role="device" aria-label="Microphone de ${config.label}">
          <option value="">Micro par défaut</option>
          ${devices.map((item, index) => `<option value="${item.deviceId}"${item.deviceId === track.deviceId ? ' selected' : ''}>${item.label || `Microphone ${index + 1}`}</option>`).join('')}
        </select>`
-    : `<small>${track.file?.name || config.hint}</small>`;
+    : `<small${hint?.warning ? ' class="track-hint track-hint--warning"' : ' class="track-hint"'}>${hint?.label || track.file?.name || config.hint}</small>`;
   const deviceLabel = device?.label || '';
   return `
     <li class="track${track.active ? '' : ' inactive'}${track.muted ? ' muted' : ''}${track.solo ? ' solo' : ''}${anySolo && !track.solo ? ' dimmed' : ''}" data-track-id="${track.id}" data-kind="${track.kind}">
@@ -97,8 +108,16 @@ export function createAudioDesk({ listElement, master, onStatus, onError, onToas
   function render() {
     if (!listElement) return;
     const anySolo = [...tracks.values()].some((track) => track.solo);
+    const sourceHint = describeSourceCapture(sourceStream, tracks.get('source'));
     listElement.innerHTML = [...tracks.values()]
-      .map((track) => trackMarkup(track, TRACK_KINDS[track.kind], devices, TRACK_KINDS[track.kind].removable, anySolo))
+      .map((track) => trackMarkup(
+        track,
+        TRACK_KINDS[track.kind],
+        devices,
+        TRACK_KINDS[track.kind].removable,
+        anySolo,
+        track.kind === 'source' ? sourceHint : null,
+      ))
       .join('');
     status();
   }

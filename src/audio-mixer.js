@@ -20,6 +20,17 @@ export function clampVolume(value) {
  * Gain réel de chaque piste. Le solo coupe les autres pistes; une piste muette
  * reste muette même si elle est en solo.
  */
+// Certaines cartes son refusent le taux imposé : sans repli, la table entière
+// resterait muette alors que tout paraît branché.
+export function openAudioContext(AudioContextCtor, options = AUDIO_CONTEXT_OPTIONS) {
+  if (!AudioContextCtor) throw new Error('AudioContext indisponible.');
+  try {
+    return new AudioContextCtor(options);
+  } catch {
+    return new AudioContextCtor();
+  }
+}
+
 export function resolveTrackGains(tracks) {
   const hasSolo = tracks.some((track) => track.solo);
   const gains = new Map();
@@ -39,7 +50,7 @@ export function levelPercent(rms) {
 export class AudioMixer {
   constructor({ createContext, createStream } = {}) {
     this.createContext = createContext
-      || (() => new (window.AudioContext || window.webkitAudioContext)(AUDIO_CONTEXT_OPTIONS));
+      || (() => openAudioContext(window.AudioContext || window.webkitAudioContext));
     this.createStream = createStream || ((tracks) => new MediaStream(tracks));
     this.context = null;
     this.master = null;

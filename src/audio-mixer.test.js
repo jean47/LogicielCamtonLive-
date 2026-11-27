@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { AUDIO_CONTEXT_OPTIONS, AudioMixer, TRACK_KINDS, clampVolume, levelPercent, resolveTrackGains } from './audio-mixer.js';
+import { AUDIO_CONTEXT_OPTIONS, AudioMixer, TRACK_KINDS, clampVolume, levelPercent, openAudioContext, resolveTrackGains } from './audio-mixer.js';
 
 // AudioContext factice : même contrat que l’API Web Audio, sans navigateur.
 function createStubContext() {
@@ -247,4 +247,22 @@ test('une piste musique coupée puis réactivée réutilise le même nœud sourc
 test('le contexte audio tourne en 48 kHz avec un tampon large', async () => {
   assert.equal(AUDIO_CONTEXT_OPTIONS.sampleRate, 48000);
   assert.equal(AUDIO_CONTEXT_OPTIONS.latencyHint, 'playback');
+});
+
+test('un AudioContext qui refuse le taux imposé retombe sur les réglages par défaut', () => {
+  const seen = [];
+  class Refusant {
+    constructor(options) {
+      seen.push(options);
+      if (options) throw new Error('NotSupportedError');
+      this.state = 'running';
+    }
+  }
+  const context = openAudioContext(Refusant);
+  assert.equal(context.state, 'running');
+  assert.deepEqual(seen, [AUDIO_CONTEXT_OPTIONS, undefined]);
+});
+
+test('le repli ne masque pas une absence totale d’AudioContext', () => {
+  assert.throws(() => openAudioContext(undefined), /AudioContext/);
 });

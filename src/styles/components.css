@@ -1202,3 +1202,6 @@ select:hover { border-color: #514680; }
   .master-strip { width: 100%; justify-content: space-between; }
   .master-meter { flex: 1; width: auto; }
 }
+
+.track-hint { color: var(--text-muted); }
+.track-hint--warning { color: var(--gold-soft); }
