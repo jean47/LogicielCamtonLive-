@@ -7,7 +7,7 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
-  # Appelé par publish-0-5-0.yml / publish-0-5-1.yml pour publier à une date choisie.
+  # Appelé par publish-0-5-2.yml pour publier à une date choisie.
   workflow_call:
     inputs:
       tag:

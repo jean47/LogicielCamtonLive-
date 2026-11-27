@@ -1,6 +1,7 @@
 {
   "version": "0.5.2",
   "notes": [
+    "TikTok par clé de flux et sortie relais RTMP : deux destinations de plus, dont une qui répartit un seul flux vers TikTok ou YouTube.",
     "Supervision des sorties : chaque destination affiche son débit réel, ses images par seconde et les images perdues, au lieu du seul « Encodage actif ».",
     "Test de débit montant : une mesure de quelques secondes dit si le préréglage choisi passe, avec de la marge ou pas du tout.",
     "Quatre destinations au lieu de deux. Au-delà de deux, l’application rappelle qu’un relais consomme moins de bande montante.",

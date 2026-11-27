@@ -1,15 +1,16 @@
-name: Publication différée — 0.5.2 (supervision, débit, rapport)
+name: Publication différée — 0.5.2 (TikTok, relais, supervision, débit, rapport)
 
-# Publie la 0.5.2 le 3 décembre 2026 à 11:00 à Paris (10:00 UTC, heure d'hiver).
-# C'est la version qui affiche le débit réel par destination, mesure le débit montant,
-# accepte quatre destinations et prépare un rapport de problème.
+# Publie la 0.5.2 le 2 décembre 2026 à 11:00 à Paris (10:00 UTC, heure d'hiver).
+# Cette version réunit les deux publications prévues : TikTok par clé de flux, sortie
+# relais RTMP, supervision du débit par destination, test de débit montant, quatre
+# destinations et rapport de problème. La 0.5.1 n'existe pas.
 #
-# La cible est le commit qui porte ces quatre chantiers. Si du code livrable apparaît
+# La cible est le commit qui porte tous ces chantiers. Si du code livrable apparaît
 # sur la branche sans changement de version d'ici là, le garde-fou échoue au lieu de
 # publier une version amputée du correctif.
 on:
   schedule:
-    - cron: '0 10 3 12 *'
+    - cron: '0 10 2 12 *'
   workflow_dispatch:
 
 permissions:

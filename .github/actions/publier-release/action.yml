@@ -7,7 +7,7 @@ description: Crée le tag si besoin, puis la release GitHub avec les fichiers du
 
 inputs:
   tag:
-    description: Tag à publier (ex. v0.5.1)
+    description: Tag à publier (ex. v0.5.2)
     required: true
   target:
     description: Commit à taguer si le tag n’existe pas encore
