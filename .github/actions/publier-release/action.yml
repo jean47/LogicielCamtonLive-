@@ -16,7 +16,7 @@ inputs:
   dossier:
     description: Dossier contenant les fichiers à joindre à la release
     required: false
-    default: build
+    default: release-files
 
 runs:
   using: composite

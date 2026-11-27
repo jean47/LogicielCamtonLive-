@@ -112,7 +112,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: camton-build
-          path: build
+          path: release-files
       - uses: ./.github/actions/publier-release
         with:
           tag: ${{ inputs.tag || github.ref_name }}

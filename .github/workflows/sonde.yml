@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: mkdir -p build && echo essai > build/essai.txt
+      - run: mkdir -p release-files && echo essai > release-files/essai.txt
       - uses: ./.github/actions/publier-release
         with:
           tag: v0.0.0-sonde
