@@ -70,6 +70,8 @@ const audioDesk = createAudioDesk({
   },
   onError: (error, noun) => showMediaError(error, noun),
   onToast: (message, type) => showToast(message, type),
+  // Le son de la source ne se rétablit pas sans une capture : on rouvre le sélecteur.
+  onRequestSource: () => $('#capturePcBtn')?.click(),
 });
 
 const SEEN_VERSION_KEY = 'camton-seen-version';

@@ -49,7 +49,7 @@ function trackMarkup(track, config, devices, removable, anySolo) {
     </li>`;
 }
 
-export function createAudioDesk({ listElement, master, onStatus, onError, onToast } = {}) {
+export function createAudioDesk({ listElement, master, onStatus, onError, onToast, onRequestSource } = {}) {
   const mixer = new AudioMixer();
   const settings = readSettings();
   const tracks = new Map();
@@ -186,13 +186,18 @@ export function createAudioDesk({ listElement, master, onStatus, onError, onToas
     try {
       if (track.kind === 'source') {
         const stream = sourceStream;
-        if (!stream || !stream.getAudioTracks().some((item) => item.readyState === 'live')) {
-          onToast?.('Relance l’aperçu de la source pour retrouver son son.', 'warning');
+        const live = stream?.getAudioTracks().some((item) => item.readyState === 'live');
+        if (!live) {
+          onToast?.('Le son de la source vient de la capture : choisis de nouveau ton écran ou ta fenêtre.', 'warning');
+          onRequestSource?.();
           render();
           return;
         }
         track.active = await mixer.attachStream(track.id, stream).catch(() => false);
-        if (!track.active) onToast?.('Le son de la source n’a pas pu être rétabli. Relance l’aperçu.', 'warning');
+        if (!track.active) {
+          onToast?.('Le son de la source n’a pas pu être rétabli : choisis de nouveau ton écran ou ta fenêtre.', 'warning');
+          onRequestSource?.();
+        }
         render();
         return;
       }
